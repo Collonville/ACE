@@ -1,28 +1,26 @@
+import copy
 import itertools
 import math
 import sys
-import copy
+
+import numpy as np
+from scipy import linalg, signal
+from scipy.fftpack import *
 
 import colour
+import cv2
 import matplotlib as mpl
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
-import numpy as np
+import numba
 import win_unicode_console
 from colour.models import *
 from colour.plotting import *
 from mpl_toolkits.mplot3d import Axes3D
 from PIL import Image, ImageColor
-from scipy import linalg
-from scipy.fftpack import *
 from sklearn.metrics import mean_squared_error
-from scipy import signal
 from sympy import *
 from sympy.matrices import *
-
-import numba
-
-import cv2
 
 win_unicode_console.enable()
 
@@ -30,7 +28,6 @@ np.seterr(all='warn', over='raise')
 
 #表示のフォーマットを定義
 np.set_printoptions(precision=8, suppress=True, threshold=np.inf, linewidth=100)
-
 
 @numba.jit('f8[:](f8[:], f8[:], i8, i8, f4)')
 def RIslow(omega, I, width, height, alpha):
@@ -130,6 +127,18 @@ ITPHue = atan2(RGB2ITP[1], RGB2ITP[2])
 
 ITPHuePartial = diff(ITPHue, r, g, b)
 
+#T値の偏微分
+ITP_T_RedPartial = diff(RGB2ITP[1], r) #0.152
+ITP_T_GrePartial = diff(RGB2ITP[1], g) #-1.41
+ITP_T_BluPartial = diff(RGB2ITP[1], b) #1.26
+print("CT Partial. Tred=%f, Tblue=%f, Tgreen= %f" % (ITP_T_RedPartial, ITP_T_GrePartial, ITP_T_BluPartial))
+
+#P値の偏微分
+ITP_P_RedPartial = diff(RGB2ITP[2], r) #1.09
+ITP_P_GrePartial = diff(RGB2ITP[2], g) #-0.775
+ITP_P_BluPartial = diff(RGB2ITP[2], b) #-0.318
+print("CP Partial. Pred=%f, Pblue=%f, Pgreen= %f" % (ITP_P_RedPartial, ITP_P_GrePartial, ITP_P_BluPartial))
+
 #色相関数の偏微分
 HRedPartial = diff(ITPHue, r)
 HGrePartial = diff(ITPHue, g)
@@ -153,23 +162,13 @@ ITP2RGB = lambdify((I_, T_, P_), (ITP2RGB[0].subs([(I, I_), (T, T_), (P, P_)]), 
 
 
 #------------------------------------------------------------------------
-inputImgPath = "M1/5050/s249_7.jpg"
-outputImgPath = "M1/5050/test_ACE-HueC.jpg"
+inputImgPath = "img/s35_4.jpg"
+outputImgPath = "outimg/test_ACE-HueC.jpg"
 doSignalConvert = False
-doBilateralFilter = False
 doHueCorrection = True
 
 #Pathに日本語が含まれるとエラー
 img = cv2.imread(inputImgPath, cv2.IMREAD_COLOR)
-
-#バイラレタルフィルタの適用
-if doBilateralFilter:
-    img = cv2.bilateralFilter(img, 15, 10, 10)
-    img = cv2.bilateralFilter(img, 15, 10, 10)
-    img = cv2.bilateralFilter(img, 15, 10, 10)
-    img = cv2.bilateralFilter(img, 15, 10, 10)
-
-    cv2.imwrite("M1/5050/2/s35_8-Filter.jpg", img)
 
 #正規化と整形
 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) / 255.
@@ -188,18 +187,26 @@ omegaFFT, omega = computeOmegaTrans(img.shape[0], img.shape[1])
 mappedImg = np.copy(RGB)
 myu = np.average(RGB, axis=0)
 
-deltaT = 0.001
+deltaT = 0.01
 gamma = 0.0
 alpha = np.abs(gamma) / 20
 beta = 1
 
 ratio = 0.5
 
+hueRate = 0.2
+
+
 for it in range(37):
     print("---------Iter:%2d, Gamma:%f, Alpha:%f---------" % (it, gamma, alpha))
 
     rgbBefore = np.zeros((img.shape[0] * img.shape[1], 3), dtype='float64')
+
     newHue = np.random.rand(img.shape[0] * img.shape[1])
+    redDiff = RGB[:, 0] 
+    greDiff = RGB[:, 1] 
+    bluDiff = RGB[:, 2] 
+    
 
     for k in range(10000):
         #エンハンス
@@ -214,8 +221,19 @@ for it in range(37):
         #色相修正
         if doHueCorrection:
             #現在のICH色情報を計算
-            ITPNow = np.asarray(RGB2ITP(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2])).T
-            ICHNow = ITP2ICH(ITPNow)
+            ITPNow = np.asarray(RGB2ITP(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2]), dtype='float64').T
+            HueNow = ITPHue(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2])
+
+            denominator = ITPNow[:, 1]**2 + ITPNow[:, 2]**2
+            hueDiff = HueNow - imgHue
+
+            redDiff = redDiff - 2 * hueRate * hueDiff * (( 0.152188 * ITPNow[:, 2] - 1.093136 * ITPNow[:, 1]) / denominator)
+            greDiff = greDiff - 2 * hueRate * hueDiff * ((-1.419960 * ITPNow[:, 2] + 0.774947 * ITPNow[:, 1]) / denominator)
+            bluDiff = bluDiff - 2 * hueRate * hueDiff * (( 1.267772 * ITPNow[:, 2] + 0.318189 * ITPNow[:, 1]) / denominator)
+
+            mappedImg = np.c_[redDiff, greDiff, bluDiff]
+            
+            newHue = ITPHue(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2])
 
             #ITPBefore = np.asarray(RGB2ITP(rgbBefore[:, 0], rgbBefore[:, 1], rgbBefore[:, 2])).T
             #ICHBefore = ITP2ICH(ITPBefore)
@@ -231,32 +249,31 @@ for it in range(37):
             #print(differential[0:5])
             
             #色相計算の更新
-            newHue = newHue - (1 - ratio) * 0.01 * (ICHNow[:, 2] - imgHue)
-            newICH = np.c_[ICHNow[:, 0], ICHNow[:, 1], newHue]
+            #newHue = newHue - (1 - ratio) * 0.1 * (ICHNow[:, 2] - imgHue)
+            #newICH = np.c_[ICHNow[:, 0], ICHNow[:, 1], newHue]
             
             #ICH色空間をRGB色空間に戻す
-            ITP = ICH2ITP(newICH)
-            mappedImg = np.asarray(ITP2RGB(ITP[:, 0], ITP[:, 1], ITP[:, 2])).T
+            #ITP = ICH2ITP(newICH)
+            #mappedImg = np.asarray(ITP2RGB(ITP[:, 0], ITP[:, 1], ITP[:, 2])).T
 
             #二乗平均平方根誤差(RMSE)による入力画像の色相差の計算
             hueLoss = np.sqrt(mean_squared_error(newHue, imgHue))
             #print("delta H=%f, Diff=%f" % (hueLoss, np.abs(np.sum(newHue - imgHue))))
 
-        allLoss = ratio * enhanceLoss + (1 - ratio) * hueLoss
-
-        print("Iter:%2d, All Loss=%f, Enhance Loss=%f, Hue Loss=%f" % (k, allLoss, enhanceLoss, hueLoss))
         if doHueCorrection:
+            allLoss = ratio * enhanceLoss + (1 - ratio) * hueLoss
+            print("Iter:%2d, k:%d, All Loss=%f, Enhance Loss=%f, Hue Loss=%f" % (it, k, allLoss, enhanceLoss, hueLoss))
+
             if allLoss< 1e-2:
-                #print("Iter:%2d, Color Loss=%f, Hue Loss=%f" % (k, cLoss, hueLoss))
                 break
             else:
                 rgbBefore = copy.deepcopy(mappedImg)
         else:
-            if  cLoss < 1e-6:
-                print("Iter:%2d, Color Loss=%f" % (k, cLoss))
+            if enhanceLoss < 1e-4:
+                print("Iter:%2d, Enhance Loss=%f" % (k, enhanceLoss))
                 break
             else:
-                rgbBefore = copy.deepcopy(mappedImg)
+                rgbBefore = np.copy(mappedImg)
     
     gamma += 0.01
     alpha += np.abs(gamma) / 20
