@@ -199,9 +199,11 @@ def optimaizeFunc(rgb):
 def optimaizeFuncGradient(rgb):
     r, g, b = np.split(rgb, 3)
 
-    rPrime = (ITPHue(r, g, b) - imgHue) * np.asarray(HRedPartial(r, g, b), dtype='float64').T
-    gPrime = (ITPHue(r, g, b) - imgHue) * np.asarray(HGrePartial(r, g, b), dtype='float64').T
-    bPrime = (ITPHue(r, g, b) - imgHue) * np.asarray(HBluPartial(r, g, b), dtype='float64').T
+    hueDiff = ITPHue(r, g, b) - imgHue
+
+    rPrime = hueDiff * np.asarray(HRedPartial(r, g, b), dtype='float64').T
+    gPrime = hueDiff * np.asarray(HGrePartial(r, g, b), dtype='float64').T
+    bPrime = hueDiff * np.asarray(HBluPartial(r, g, b), dtype='float64').T
 
     return np.r_[rPrime, gPrime, bPrime]
 
