@@ -125,8 +125,6 @@ RGB2ITP = LMS2ITP_Mat * RGB2LMS_Mat * Matrix([r, g, b])
 ITP2RGB = RGB2LMS_Mat.inv() * LMS2ITP_Mat.inv() * Matrix([I, T, P])
 ITPHue = atan2(RGB2ITP[1], RGB2ITP[2])
 
-ITPHuePartial = diff(ITPHue, r, g, b)
-
 #T値の偏微分
 ITP_T_RedPartial = diff(RGB2ITP[1], r) # 0.152
 ITP_T_GrePartial = diff(RGB2ITP[1], g) #-1.41
@@ -146,7 +144,6 @@ HBluPartial = diff(ITPHue, b)
 
 #ITP色相の関数化
 ITPHue = lambdify((r_, g_, b_), ITPHue.subs([(r, r_), (g, g_), (b, b_)]), "numpy")
-ITPHuePartial = lambdify((r_, g_, b_), ITPHuePartial.subs([(r, r_), (g, g_), (b, b_)]), "numpy")
 
 #偏微分をlambdifyで関数化
 HRedPartial = lambdify((r_, g_, b_), HRedPartial.subs([(r, r_), (g, g_), (b, b_)]), "numpy")
