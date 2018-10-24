@@ -6,6 +6,7 @@ import sys
 import numpy as np
 from scipy import linalg, signal
 from scipy.fftpack import *
+from scipy.optimize import *
 
 import colour
 import cv2
@@ -61,7 +62,6 @@ def computeOmegaTrans(width, height):
 
     omega = np.zeros(width * height, dtype='float64')
 
-    print("%d, %d" % (height, width))
     if omegaDistanceFunc is "Gaussian":
         sigma = 10
         for y in range(height):
@@ -128,13 +128,13 @@ ITPHue = atan2(RGB2ITP[1], RGB2ITP[2])
 ITPHuePartial = diff(ITPHue, r, g, b)
 
 #T値の偏微分
-ITP_T_RedPartial = diff(RGB2ITP[1], r) #0.152
+ITP_T_RedPartial = diff(RGB2ITP[1], r) # 0.152
 ITP_T_GrePartial = diff(RGB2ITP[1], g) #-1.41
-ITP_T_BluPartial = diff(RGB2ITP[1], b) #1.26
+ITP_T_BluPartial = diff(RGB2ITP[1], b) # 1.26
 print("CT Partial. Tred=%f, Tblue=%f, Tgreen= %f" % (ITP_T_RedPartial, ITP_T_GrePartial, ITP_T_BluPartial))
 
 #P値の偏微分
-ITP_P_RedPartial = diff(RGB2ITP[2], r) #1.09
+ITP_P_RedPartial = diff(RGB2ITP[2], r) # 1.09
 ITP_P_GrePartial = diff(RGB2ITP[2], g) #-0.775
 ITP_P_BluPartial = diff(RGB2ITP[2], b) #-0.318
 print("CP Partial. Pred=%f, Pblue=%f, Pgreen= %f" % (ITP_P_RedPartial, ITP_P_GrePartial, ITP_P_BluPartial))
@@ -163,7 +163,7 @@ ITP2RGB = lambdify((I_, T_, P_), (ITP2RGB[0].subs([(I, I_), (T, T_), (P, P_)]), 
 
 #------------------------------------------------------------------------
 inputImgPath = "img/s35_4.jpg"
-outputImgPath = "outimg/test_ACE-HueC.jpg"
+outputImgPath = "outimg/test-HueC.jpg"
 doSignalConvert = False
 doHueCorrection = True
 
@@ -187,28 +187,33 @@ omegaFFT, omega = computeOmegaTrans(img.shape[0], img.shape[1])
 mappedImg = np.copy(RGB)
 myu = np.average(RGB, axis=0)
 
-deltaT = 0.01
+deltaT = 0.1
 gamma = 0.0
 alpha = np.abs(gamma) / 20
 beta = 1
 
 ratio = 0.5
 
-hueRate = 0.2
+def optimaizeFunc(rgb):
+    r, g, b = np.split(rgb, 3)
 
+    return 0.5 * np.sum((ITPHue(r, g, b) - imgHue)**2)
+
+def optimaizeFuncGradient(rgb):
+    r, g, b = np.split(rgb, 3)
+
+    rPrime = (ITPHue(r, g, b) - imgHue) * np.asarray(HRedPartial(r, g, b), dtype='float64').T
+    gPrime = (ITPHue(r, g, b) - imgHue) * np.asarray(HGrePartial(r, g, b), dtype='float64').T
+    bPrime = (ITPHue(r, g, b) - imgHue) * np.asarray(HBluPartial(r, g, b), dtype='float64').T
+
+    return np.r_[rPrime, gPrime, bPrime]
 
 for it in range(37):
     print("---------Iter:%2d, Gamma:%f, Alpha:%f---------" % (it, gamma, alpha))
 
     rgbBefore = np.zeros((img.shape[0] * img.shape[1], 3), dtype='float64')
-
-    newHue = np.random.rand(img.shape[0] * img.shape[1])
-    redDiff = RGB[:, 0] 
-    greDiff = RGB[:, 1] 
-    bluDiff = RGB[:, 2] 
     
-
-    for k in range(10000):
+    for k in range(50):
         #エンハンス
         for colorCh in range(3):
             contrast = RIslow(omegaFFT, mappedImg[:, colorCh], img.shape[0], img.shape[1], alpha)
@@ -220,51 +225,25 @@ for it in range(37):
 
         #色相修正
         if doHueCorrection:
-            #現在のICH色情報を計算
-            ITPNow = np.asarray(RGB2ITP(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2]), dtype='float64').T
-            HueNow = ITPHue(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2])
+            #最適化
+            hueOpt = minimize(optimaizeFunc, mappedImg.flatten('F'), 
+                                method='CG',  
+                                options={'gtol': 1e-6, 'disp': False},
+                                jac=optimaizeFuncGradient
+                            )
 
-            denominator = ITPNow[:, 1]**2 + ITPNow[:, 2]**2
-            hueDiff = HueNow - imgHue
+            #最適化結果を整形
+            r, g, b = np.split(hueOpt.x, 3)
+            mappedImg = np.c_[r, g, b]
 
-            redDiff = redDiff - 2 * hueRate * hueDiff * (( 0.152188 * ITPNow[:, 2] - 1.093136 * ITPNow[:, 1]) / denominator)
-            greDiff = greDiff - 2 * hueRate * hueDiff * ((-1.419960 * ITPNow[:, 2] + 0.774947 * ITPNow[:, 1]) / denominator)
-            bluDiff = bluDiff - 2 * hueRate * hueDiff * (( 1.267772 * ITPNow[:, 2] + 0.318189 * ITPNow[:, 1]) / denominator)
-
-            mappedImg = np.c_[redDiff, greDiff, bluDiff]
-            
-            newHue = ITPHue(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2])
-
-            #ITPBefore = np.asarray(RGB2ITP(rgbBefore[:, 0], rgbBefore[:, 1], rgbBefore[:, 2])).T
-            #ICHBefore = ITP2ICH(ITPBefore)
-
-            #ITP値の微分値を計算
-            #ITPDiff = ITPBefore - ITPNow
-
-            #TP(RGBからなる関数)の変化分を計算
-            #differential = (ITPDiff[:, 1] * ITPNow[:, 2] - ITPDiff[:, 2] * ITPNow[:, 1]) / (ITPNow[:, 1]**2 + ITPNow[:, 2]**2)
-            #differential = 1 / (1 + (ITPNow[:, 1] / ITPNow[:, 2])**2)
-            #differential = ICHNow[:, 2] - ICHBefore[:, 2]
-            #differential = np.asarray(ITPHuePartial(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2])).T
-            #print(differential[0:5])
-            
-            #色相計算の更新
-            #newHue = newHue - (1 - ratio) * 0.1 * (ICHNow[:, 2] - imgHue)
-            #newICH = np.c_[ICHNow[:, 0], ICHNow[:, 1], newHue]
-            
-            #ICH色空間をRGB色空間に戻す
-            #ITP = ICH2ITP(newICH)
-            #mappedImg = np.asarray(ITP2RGB(ITP[:, 0], ITP[:, 1], ITP[:, 2])).T
-
-            #二乗平均平方根誤差(RMSE)による入力画像の色相差の計算
-            hueLoss = np.sqrt(mean_squared_error(newHue, imgHue))
-            #print("delta H=%f, Diff=%f" % (hueLoss, np.abs(np.sum(newHue - imgHue))))
+            #入力画像との色相差を計算
+            hueLoss = np.sqrt(mean_squared_error(ITPHue(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2]), imgHue))
 
         if doHueCorrection:
             allLoss = ratio * enhanceLoss + (1 - ratio) * hueLoss
-            print("Iter:%2d, k:%d, All Loss=%f, Enhance Loss=%f, Hue Loss=%f" % (it, k, allLoss, enhanceLoss, hueLoss))
+            print("Iter:%2d, k:%4d, All Loss=%f, Enhance Loss=%f, Hue Loss=%f" % (it, k, allLoss, enhanceLoss, hueLoss))
 
-            if allLoss< 1e-2:
+            if allLoss < 1e-4:
                 break
             else:
                 rgbBefore = copy.deepcopy(mappedImg)
@@ -279,8 +258,7 @@ for it in range(37):
     alpha += np.abs(gamma) / 20
 
 #入力画像との色相の絶対平均誤差の計算
-ICH = ITP2ICH(np.asarray(RGB2ITP(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2])).T)
-print("Hue Loss : %f" % (np.sqrt(mean_squared_error(ICH[:, 2], imgHue))))
+print("Hue Loss : %f" % (np.sqrt(mean_squared_error(ITPHue(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2]), imgHue))))
 
 #視覚実験に基づくLED制御値への変換
 if doSignalConvert:
