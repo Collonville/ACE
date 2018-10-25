@@ -159,8 +159,8 @@ ITP2RGB = lambdify((I_, T_, P_), (ITP2RGB[0].subs([(I, I_), (T, T_), (P, P_)]), 
 
 
 #------------------------------------------------------------------------
-inputImgPath = "img/s35_4.jpg"
-outputImgPath = "outimg/test-HueC.jpg"
+inputImgPath = "img/s404_6.jpg"
+outputImgPath = "outimg/s404_6-HueC.jpg"
 doSignalConvert = False
 doHueCorrection = True
 
@@ -212,7 +212,7 @@ for it in range(37):
 
     rgbBefore = np.zeros((img.shape[0] * img.shape[1], 3), dtype='float64')
     
-    for k in range(50):
+    for k in range(100):
         #エンハンス
         for colorCh in range(3):
             contrast = RIslow(omegaFFT, mappedImg[:, colorCh], img.shape[0], img.shape[1], alpha)
