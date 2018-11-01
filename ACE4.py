@@ -159,10 +159,10 @@ ITP2RGB = lambdify((I_, T_, P_), (ITP2RGB[0].subs([(I, I_), (T, T_), (P, P_)]), 
 
 
 #------------------------------------------------------------------------
-inputImgPath = "img/s404_6.jpg"
-outputImgPath = "outimg/s404_6-HueC.jpg"
+inputImgPath = "img/strawberry.jpg"
+outputImgPath = "outimg/continuity/strawberry"
 doSignalConvert = False
-doHueCorrection = True
+doHueCorrection = False
 
 #Pathに日本語が含まれるとエラー
 img = cv2.imread(inputImgPath, cv2.IMREAD_COLOR)
@@ -207,12 +207,12 @@ def optimaizeFuncGradient(rgb):
 
     return np.r_[rPrime, gPrime, bPrime]
 
-for it in range(37):
+for it in range(51):
     print("---------Iter:%2d, Gamma:%f, Alpha:%f---------" % (it, gamma, alpha))
 
     rgbBefore = np.zeros((img.shape[0] * img.shape[1], 3), dtype='float64')
     
-    for k in range(100):
+    for k in range(2000):
         #エンハンス
         for colorCh in range(3):
             contrast = RIslow(omegaFFT, mappedImg[:, colorCh], img.shape[0], img.shape[1], alpha)
@@ -252,6 +252,11 @@ for it in range(37):
                 break
             else:
                 rgbBefore = np.copy(mappedImg)
+    
+    if (it % 5) == 0:
+        img_ = np.clip(mappedImg, 0, 1)
+        im = Image.fromarray(np.uint8(img_.reshape((img.shape[0], img.shape[1], 3)) * 255))
+        im.save(outputImgPath + "_" + str(it) + ".jpg", quality=100)
     
     gamma += 0.01
     alpha += np.abs(gamma) / 20
@@ -313,6 +318,7 @@ ax3.imshow(img, interpolation='none')
 ax4.imshow(mappedImg, interpolation='none')
 
 plt.show()
-'''
+
 im = Image.fromarray(np.uint8(mappedImg.reshape((img.shape[0], img.shape[1], 3)) * 255))
 im.save(outputImgPath)
+'''
