@@ -161,11 +161,12 @@ ITP2RGB = lambdify((I_, T_, P_), (ITP2RGB[0].subs([(I, I_), (T, T_), (P, P_)]), 
 
 
 #------------------------------------------------------------------------
-inputImgPath = "img/strawberry.jpg"
-outputImgPath = "outimg/continuity/strawberry"
+fileName = "strawberry"
+inputImgPath = "img/" + fileName + ".jpg"
+outputImgPath = "outimg/continuity/" + fileName
 doSignalConvert = False
 doHueCorrection = False
-OUT_CONSECUTIVE_IMG = False
+OUT_CONSECUTIVE_IMG = True
 
 #Pathに日本語が含まれるとエラー
 inputImg = cv2.imread(inputImgPath, cv2.IMREAD_COLOR)
@@ -269,7 +270,7 @@ def getFeature(img):
 
     return np.r_[aveGrad, hueEntropy, satEntropy, lumEntropy]
 
-MAX_ITER = 30
+MAX_ITER = 100
 feature = np.zeros((MAX_ITER, 4), dtype='float64')
 momentFeature = np.zeros((MAX_ITER, 12), dtype='float64')
 
@@ -278,7 +279,7 @@ for it in range(MAX_ITER):
 
     rgbBefore = np.zeros((inputImg.shape[0] * inputImg.shape[1], 3), dtype='float64')
     
-    for k in range(2000):
+    for k in range(4000):
         #エンハンス
         for colorCh in range(3):
             contrast = RIslow(omegaFFT, mappedImg[:, colorCh], inputImg.shape[0], inputImg.shape[1], alpha)
@@ -313,7 +314,7 @@ for it in range(MAX_ITER):
             else:
                 rgbBefore = copy.deepcopy(mappedImg)
         else:
-            if enhanceLoss < 1e-4:
+            if enhanceLoss < 1e-5:
                 print("Iter:%2d, Enhance Loss=%f" % (k, enhanceLoss))
                 break
             else:
@@ -323,7 +324,7 @@ for it in range(MAX_ITER):
     momentFeature[it] = moment
     feature[it] = getFeature(mappedImg)
 
-    if (it % 5) == 0 and OUT_CONSECUTIVE_IMG:
+    if (it % 1) == 0 and OUT_CONSECUTIVE_IMG:
         img_ = np.clip(mappedImg, 0, 1)
         im = Image.fromarray(np.uint8(img_.reshape((inputImg.shape[0], inputImg.shape[1], 3)) * 255))
         im.save(outputImgPath + "_" + str(it) + ".jpg", quality=100)
@@ -343,7 +344,7 @@ if doSignalConvert:
     signal = [np.dot(Ml, rgb) for rgb in mappedImg]
     mappedImg = np.array(signal)
 
-fig, axes = plt.subplots(nrows=1, ncols=6)
+fig, axes = plt.subplots(nrows=2, ncols=3)
 ax = axes.ravel()
 
 ax[0].plot(feature[:, 0], label="Average Gradient")
@@ -387,6 +388,9 @@ ax[5].grid(True)
 ax[5].legend(loc="upper right")
 
 plt.show()
+
+np.save(fileName + "_Featers", feature)
+np.save(fileName + "_MomentFeaters", momentFeature)
 sys.exit()
 
 #(H,W,3)に整形とクリップ処理
