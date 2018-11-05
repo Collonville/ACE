@@ -24,11 +24,11 @@ win_unicode_console.enable()
 #表示のフォーマットを定義
 np.set_printoptions(precision=8, suppress=True, threshold=np.inf, linewidth=100)
 
-  
+argv = sys.argv
 
 #------------------------------------------------------------------------
-ImgPath1 = "outimg/continuity/wool_0.jpg"
-ImgPath2 = "outimg/continuity/wool_15.jpg"
+ImgPath1 = argv[1]
+ImgPath2 = argv[2]
 
 #Pathに日本語が含まれるとエラー
 img1 = cv2.imread(ImgPath1, cv2.IMREAD_COLOR)
@@ -43,6 +43,7 @@ RGB2 = np.reshape(img2, (img2.shape[0] * img2.shape[1], 3)) / 255.0
 #------------------------------------------------------------------------
 BIN_NUM = 100
 
+'''
 hsv1 = colour.RGB_to_HSL(RGB1)
 hsv2 = colour.RGB_to_HSL(RGB2)
 
@@ -57,9 +58,11 @@ ax[0].set_title('Original Image')
 hist, bins, pathes = ax[1].hist(hsv2[:, 1].flatten(), bins=BIN_NUM)
 print(entropy(hist, base=2))
 ax[1].set_title('Original Image')
-
 plt.show()
-sys.exit()
+'''
+
+
+
 #-----------------------------------------------
 redGrad1 = filters.sobel(img1[:, :, 0])
 greGrad1 = filters.sobel(img1[:, :, 1])
@@ -75,6 +78,17 @@ aveGrad2 = np.sum(imgGrad2) / (img2.shape[0] * img2.shape[1])
 
 print("Average Gradient:%f, %f" % (aveGrad1, aveGrad2))
 
+#-----------------------------------------------
+#勾配情報のSurfaceプロット
+x = np.arange(0, img1.shape[0])
+y = np.arange(0, img1.shape[1])
+X, Y = np.meshgrid(x, y)
+
+fig = plt.figure()
+ax = fig.gca(projection='3d')
+ax.invert_xaxis()
+surf = ax.plot_surface(X, Y, imgGrad1, cmap=cm.coolwarm)
+#-----------------------------------------------
 
 #勾配値の最大値を取得
 maxValue = np.max(np.maximum(imgGrad1, imgGrad2))
