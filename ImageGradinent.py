@@ -24,11 +24,11 @@ win_unicode_console.enable()
 #表示のフォーマットを定義
 np.set_printoptions(precision=8, suppress=True, threshold=np.inf, linewidth=100)
 
-  
+argv = sys.argv
 
 #------------------------------------------------------------------------
-ImgPath1 = "outimg/continuity/wool_0.jpg"
-ImgPath2 = "outimg/continuity/wool_15.jpg"
+ImgPath1 = argv[1]
+ImgPath2 = argv[2]
 
 #Pathに日本語が含まれるとエラー
 img1 = cv2.imread(ImgPath1, cv2.IMREAD_COLOR)
@@ -59,7 +59,6 @@ print(entropy(hist, base=2))
 ax[1].set_title('Original Image')
 
 plt.show()
-sys.exit()
 #-----------------------------------------------
 redGrad1 = filters.sobel(img1[:, :, 0])
 greGrad1 = filters.sobel(img1[:, :, 1])

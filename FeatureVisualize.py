@@ -15,8 +15,9 @@ import cv2
 win_unicode_console.enable()
 
 #------------------------------------------------------------------------
-inputImgPath = "img/strawberry.jpg"
-outputImgPath = "outimg/continuity/strawberry"
+argv = sys.argv
+ImgPath1 = argv[1]
+ImgPath2 = argv[2]
 
 fig, axes = plt.subplots(nrows=1, ncols=6)
 ax = axes.ravel()
