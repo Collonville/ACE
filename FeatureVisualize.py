@@ -72,12 +72,19 @@ def getFeature(img):
 
     return np.r_[aveGrad, hueEntropy, satEntropy, lumEntropy]
 
+def getEntropy(pixels, BIN_NUM=50):
+    entropy1 = entropy(np.histogram(pixels[:, 0].flatten(), bins=BIN_NUM)[0], base=2)
+    entropy2 = entropy(np.histogram(pixels[:, 1].flatten(), bins=BIN_NUM)[0], base=2)
+    entropy3 = entropy(np.histogram(pixels[:, 2].flatten(), bins=BIN_NUM)[0], base=2)
+
+    return np.r_[entropy1, entropy2, entropy3]
+
 win_unicode_console.enable()
 #------------------------------------------------------------------------
 
 #連続画像から特徴を計算する
 BY_CONTINUS_IMAGE = True
-COLOR_SPACE = "RGB"
+COLOR_SPACE = "HSL"
 
 argv = sys.argv
 
