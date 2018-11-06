@@ -182,7 +182,7 @@ imgICH = ITP2ICH(imgITP)
 #入力画像の色相値([-pi, pi])
 imgHue = ITPHue(RGB[:, 0], RGB[:, 1], RGB[:, 2])
 
-#-----------------------------------------------
+#------------------------------------------------------------------------
 omegaFFT, omega = computeOmegaTrans(inputImg.shape[0], inputImg.shape[1])
 
 mappedImg = np.copy(RGB)
@@ -335,6 +335,7 @@ for it in range(MAX_ITER):
 #入力画像との色相の絶対平均誤差の計算
 print("Hue Loss : %f" % (np.sqrt(mean_squared_error(ITPHue(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2]), imgHue))))
 
+#------------------------------------------------------------------------
 #視覚実験に基づくLED制御値への変換
 if doSignalConvert:
     Ml = np.matrix([[0.7126, 0.1142, 0.0827],
@@ -344,6 +345,13 @@ if doSignalConvert:
     signal = [np.dot(Ml, rgb) for rgb in mappedImg]
     mappedImg = np.array(signal)
 
+#------------------------------------------------------------------------
+#特徴量の保存
+np.save("features/" + fileName + "_Features", feature)
+np.save("features/" + fileName + "_MomentFeatures", momentFeature)
+
+#------------------------------------------------------------------------
+#特徴量の可視化
 fig, axes = plt.subplots(nrows=2, ncols=3)
 ax = axes.ravel()
 
