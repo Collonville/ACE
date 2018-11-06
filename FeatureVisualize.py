@@ -1,22 +1,119 @@
 import sys
 
+import colour
+import cv2
 import matplotlib as mpl
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 import win_unicode_console
-
+from colour.models import *
 from mpl_toolkits.mplot3d import Axes3D
 from PIL import Image, ImageColor
-import cv2
+from scipy.stats import entropy, kurtosis, skew
+from skimage import filters
+
+def colorMoment(img):
+    #www.kki.yamanashi.ac.jp/~ohbuchi/courses/2013/sm2013/pdf/sm13_lect01_20131007.pdf
+    img = np.clip(img, 0, 1)
+
+    rChannel = img[:, 0]
+    gChannel = img[:, 1]
+    bChannel = img[:, 2]
+
+    #平均
+    rMean = np.mean(rChannel)
+    gMean = np.mean(gChannel)
+    bMean = np.mean(bChannel)
+
+    #分散
+    rVar = np.var(rChannel)
+    gVar = np.var(gChannel)
+    bVar = np.var(bChannel)
+
+    #共分散
+    #bias=True:画素数で割る、rowvar=False:各チャンネルが列に並んでいるため
+    rgbCov = np.cov(img, bias=True, rowvar=False)
+
+    #歪度
+    rSkew = skew(rChannel)
+    gSkew = skew(gChannel)
+    bSkew = skew(bChannel)
+
+    #尖度
+    rKurt = kurtosis(rChannel)
+    gKurt = kurtosis(gChannel)
+    bKurt = kurtosis(bChannel)
+
+    rMoment = [rMean, rVar, rSkew, rKurt]
+    gMoment = [gMean, gVar, gSkew, gKurt]
+    bMoment = [bMean, bVar, bSkew, bKurt]
+
+    return np.r_[rMoment, gMoment, bMoment], rgbCov
+
+def getFeature(img):
+    img = np.clip(img, 0, 1)
+    img_reshaped = img.reshape((inputImg.shape[0], inputImg.shape[1], 3))
+
+    #勾配値情報
+    redGrad = filters.sobel(img_reshaped[:, :, 0])
+    greGrad = filters.sobel(img_reshaped[:, :, 1])
+    bluGrad = filters.sobel(img_reshaped[:, :, 2])
+    imgGrad = np.sqrt(redGrad**2 + greGrad**2 + bluGrad**2)
+    aveGrad = np.sum(imgGrad) / (img_reshaped.shape[0] * img_reshaped.shape[1])
+
+    #エントロピー情報
+    BIN_NUM = 50
+    hsl = colour.RGB_to_HSL(img)
+
+    hueEntropy = entropy(np.histogram(hsl[:, 0].flatten(), bins=BIN_NUM)[0], base=2)
+    satEntropy = entropy(np.histogram(hsl[:, 1].flatten(), bins=BIN_NUM)[0], base=2)
+    lumEntropy = entropy(np.histogram(hsl[:, 2].flatten(), bins=BIN_NUM)[0], base=2)
+
+    return np.r_[aveGrad, hueEntropy, satEntropy, lumEntropy]
 
 win_unicode_console.enable()
+#------------------------------------------------------------------------
+
+#連続画像から特徴を計算する
+BY_CONTINUS_IMAGE = True
+COLOR_SPACE = "RGB"
+
+argv = sys.argv
+
+imgName = argv[1]
+
+if BY_CONTINUS_IMAGE:
+    MAX_ITER = 100
+    feature = np.zeros((MAX_ITER, 4), dtype='float64')
+    momentFeature = np.zeros((MAX_ITER, 12), dtype='float64')
+
+    for it in range(MAX_ITER):
+        path = "outimg/continuity/" + imgName + "_" + str(it) + ".jpg"
+        inputImg = cv2.imread(path, cv2.IMREAD_COLOR)
+
+        #正規化と整形
+        inputImg = cv2.cvtColor(inputImg, cv2.COLOR_BGR2RGB) / 255.
+        rgb = np.reshape(inputImg, (inputImg.shape[0] * inputImg.shape[1], 3))
+
+        #色空間の変換
+        if COLOR_SPACE is "RGB":
+            pixel = rgb
+        elif COLOR_SPACE is "HSV":
+            pixel = colour.RGB_to_HSV(rgb)
+        elif COLOR_SPACE is "HSL":
+            pixel = colour.RGB_to_HSL(rgb)
+
+        feature[it] = getFeature(pixel)
+        moment, cov = colorMoment(pixel)
+        momentFeature[it] = moment
+else:
+    feature = np.load("features/" + imgName + "_Features.npy")
+    momentFeature = np.load("features/" + imgName + "_MomentFeatures.npy")
+
 
 #------------------------------------------------------------------------
-argv = sys.argv
-feature = np.load(argv[1] + "_Features.npy")
-momentFeature = np.load(argv[1] + "_MomentFeatures.npy")
-
+#可視化
 fig, axes = plt.subplots(nrows=2, ncols=3)
 ax = axes.ravel()
 
