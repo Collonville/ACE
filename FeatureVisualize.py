@@ -1,5 +1,3 @@
-import copy
-import itertools
 import sys
 
 import matplotlib as mpl
@@ -27,6 +25,7 @@ ax[0].set_title("Average Gradient")
 ax[0].grid(True)
 ax[0].legend()
 ax[0].set_xlabel("Iter")
+ax[0].set_ylim(0.0, 1.0)
 
 #エントロピー
 ax[1].plot(feature[:, 1], label="Hue")
@@ -43,6 +42,7 @@ ax[2].plot(momentFeature[:, 4], label="Green")
 ax[2].plot(momentFeature[:, 8], label="Blue")
 ax[2].set_title(u"RGB Mean")
 ax[2].set_xlabel("Iter")
+ax[2].set_ylim(0.0, 1.0)
 ax[2].grid(True)
 ax[2].legend(loc="upper right")
 
@@ -53,7 +53,7 @@ ax[3].plot(momentFeature[:, 9], label="Blue")
 ax[3].set_title(u"RGB Variance")
 ax[3].set_xlabel("Iter")
 ax[3].grid(True)
-ax[3].legend(loc="upper right")
+ax[3].legend()
 
 #歪度
 ax[4].plot(momentFeature[:, 2], label="Red")
@@ -62,7 +62,7 @@ ax[4].plot(momentFeature[:, 10], label="Blue")
 ax[4].set_title(u"RGB Skweness")
 ax[4].set_xlabel("Iter")
 ax[4].grid(True)
-ax[4].legend(loc="upper right")
+ax[4].legend()
 
 #尖度
 ax[5].plot(momentFeature[:, 3], label="Red")
@@ -71,7 +71,7 @@ ax[5].plot(momentFeature[:, 11], label="Blue")
 ax[5].set_title("RGB kurtosis")
 ax[5].set_xlabel("Iter")
 ax[5].grid(True)
-ax[5].legend(loc="upper right")
+ax[5].legend()
 
 plt.tight_layout()
 plt.show()
