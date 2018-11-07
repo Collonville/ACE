@@ -11,8 +11,12 @@ from mpl_toolkits.mplot3d import Axes3D
 from PIL import Image, ImageColor
 from scipy.stats import entropy, kurtosis, skew
 from skimage import filters
+from skimage import data
+from skimage.measure import *
+from sklearn.metrics import mean_squared_error
 
 import cv2
+
 
 
 def getColorMoment(img):
@@ -65,18 +69,40 @@ def getAveGrad(pixels):
     return np.sum(imgGrad) / (inputImg.shape[0] * inputImg.shape[1])
 
 def getEntropy(pixels, BIN_NUM=50):
+    entropy1 = shannon_entropy(pixels[:, 0])
+    entropy2 = shannon_entropy(pixels[:, 1])
+    entropy3 = shannon_entropy(pixels[:, 2])
+    '''
     entropy1 = entropy(np.histogram(pixels[:, 0], bins=BIN_NUM)[0], base=2)
     entropy2 = entropy(np.histogram(pixels[:, 1], bins=BIN_NUM)[0], base=2)
     entropy3 = entropy(np.histogram(pixels[:, 2], bins=BIN_NUM)[0], base=2)
-
+    '''
     return np.r_[entropy1, entropy2, entropy3]
+
+def getDistance(pixels1, pixels2):
+    lab1 = colour.XYZ_to_Lab(colour.sRGB_to_XYZ(pixels1))
+    lab2 = colour.XYZ_to_Lab(colour.sRGB_to_XYZ(pixels2))
+    dist = mean_squared_error(lab1, lab2)
+
+    #dist = np.sqrt((pixels1[:, 0] - pixels2[:, 0])**2 + (pixels1[:, 1] - pixels2[:, 1])**2 + (pixels1[:, 2] - pixels2[:, 2])**2)
+    #dist = np.sum(dist)
+
+    return dist
+
+def getImageMeasure(pixels1, pixels2):
+    NRMSE = compare_nrmse(pixels1, pixels2)
+    PSNR = compare_psnr(pixels1, pixels2)
+    SSIM = compare_ssim(pixels1, pixels2, multichannel=True)
+    
+    return [NRMSE, PSNR, SSIM]
+
 
 win_unicode_console.enable()
 #------------------------------------------------------------------------
 
 #連続画像から特徴を計算する
 BY_CONTINUS_IMAGE = True
-COLOR_SPACE = "HSL"
+COLOR_SPACE = "HSV"
 
 argv = sys.argv
 
@@ -88,6 +114,8 @@ if BY_CONTINUS_IMAGE:
     moments = np.zeros((MAX_ITER, 12), dtype='float64')
     entropys = np.zeros((MAX_ITER, 3), dtype='float64')
     aveGrads = np.zeros(MAX_ITER, dtype='float64')
+    colorDist = np.zeros(MAX_ITER, dtype='float64')
+    measures = np.zeros((MAX_ITER, 3), dtype='float64')
 
     for it in range(MAX_ITER):
         path = "outimg/continuity/" + imgName + "_" + str(it) + ".jpg"
@@ -96,6 +124,10 @@ if BY_CONTINUS_IMAGE:
         #正規化と整形
         inputImg = cv2.cvtColor(inputImg, cv2.COLOR_BGR2RGB) / 255.
         rgb = np.reshape(inputImg, (inputImg.shape[0] * inputImg.shape[1], 3))
+        
+        #初期画像の保存
+        if(it == 0):
+            initialImg = rgb
 
         #色空間の変換
         if COLOR_SPACE is "RGB":
@@ -109,13 +141,15 @@ if BY_CONTINUS_IMAGE:
         entropys[it] = getEntropy(pixel)
         moment, cov = getColorMoment(pixel)
         moments[it] = moment
+        colorDist[it] = getDistance(initialImg, rgb)
+        measures[it] = getImageMeasure(initialImg, rgb)
 else:
     feature = np.load("features/" + imgName + "_Features.npy")
     momentFeature = np.load("features/" + imgName + "_MomentFeatures.npy")
 
 #------------------------------------------------------------------------
 #可視化
-fig, axes = plt.subplots(nrows=2, ncols=3)
+fig, axes = plt.subplots(nrows=2, ncols=4)
 ax = axes.ravel()
 
 fig.suptitle('Features of ' + imgName + ".jpg Color Space:" + COLOR_SPACE, fontsize=12, fontweight='bold')
@@ -174,5 +208,20 @@ ax[5].set_xlabel("Iter")
 ax[5].grid(True)
 ax[5].legend()
 
-plt.tight_layout()
+ax[6].plot(colorDist)
+ax[6].set_title("Euclid Distance from init Img")
+ax[6].set_xlabel("Iter")
+ax[6].grid(True)
+ax[6].legend()
+
+#PSNRは類似度が全く一緒だとlog0-->無限になるため、正規化する際は1つインデックスをずらず
+ax[7].plot(measures[:, 0], label="NRMSE")
+ax[7].plot(measures[:, 1] / np.max(measures[1:, 1]), label="PSNR(Normed)")
+ax[7].plot(measures[:, 2], label="SSIM")
+ax[7].set_title("Measures")
+ax[7].set_xlabel("Iter")
+ax[7].grid(True)
+ax[7].legend()
+
+#plt.tight_layout()
 plt.show()
