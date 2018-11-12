@@ -14,14 +14,15 @@ from skimage import filters
 from skimage import data
 from skimage.measure import *
 from sklearn.metrics import mean_squared_error
+import pandas as pd
+import seaborn as sns
 
 import cv2
 
 
 
-def getColorMoment(img):
+def getColorMoment(img, BIN_NUM=50):
     #www.kki.yamanashi.ac.jp/~ohbuchi/courses/2013/sm2013/pdf/sm13_lect01_20131007.pdf
-    img = np.clip(img, 0, 1)
 
     rChannel = img[:, 0]
     gChannel = img[:, 1]
@@ -96,6 +97,20 @@ def getImageMeasure(pixels1, pixels2):
     
     return [NRMSE, PSNR, SSIM]
 
+#Measuring colourfulness in natural images [D.hasler, S.Susstrunk]
+def getColourFulness(rgb):
+    rg = rgb[:, 0] - rgb[:, 1]
+    yb = 0.5 * (rgb[:, 0] + rgb[:, 1]) - rgb[:, 2]
+
+    mean_rgyb = np.sqrt(np.mean(rg)**2 + np.mean(yb)**2)
+    var_rgyb = np.sqrt(np.var(rg)**2 + np.var(yb)**2)
+
+    return var_rgyb + 0.3 * mean_rgyb
+
+def getNaturalness(rgb):
+    XYZ = colour.sRGB_to_XYZ(rgb)
+    LUV = colour.XYZ_to_Luv(XYZ)
+
 
 win_unicode_console.enable()
 #------------------------------------------------------------------------
@@ -116,6 +131,7 @@ if BY_CONTINUS_IMAGE:
     aveGrads = np.zeros(MAX_ITER, dtype='float64')
     colorDist = np.zeros(MAX_ITER, dtype='float64')
     measures = np.zeros((MAX_ITER, 3), dtype='float64')
+    cf = np.zeros(MAX_ITER, dtype='float64')
 
     for it in range(MAX_ITER):
         path = "outimg/continuity/" + imgName + "_" + str(it) + ".jpg"
@@ -143,33 +159,36 @@ if BY_CONTINUS_IMAGE:
         moments[it] = moment
         colorDist[it] = getDistance(initialImg, rgb)
         measures[it] = getImageMeasure(initialImg, rgb)
+        cf[it] = getColourFulness(rgb)
 else:
     feature = np.load("features/" + imgName + "_Features.npy")
     momentFeature = np.load("features/" + imgName + "_MomentFeatures.npy")
 
 #------------------------------------------------------------------------
 #可視化
+sns.lineplot(data=pd.DataFrame(cf))
+plt.show()
+
+sys.exit()
+
+sns.set(style="darkgrid")
 fig, axes = plt.subplots(nrows=2, ncols=4)
 ax = axes.ravel()
 
 fig.suptitle('Features of ' + imgName + ".jpg Color Space:" + COLOR_SPACE, fontsize=12, fontweight='bold')
 
 #平均勾配
-ax[0].plot(aveGrads)
-ax[0].set_title("Average Gradient")
-ax[0].grid(True)
-ax[0].legend()
-ax[0].set_xlabel("Iter")
 ax[0].set_ylim(0.0, 1.0)
+sns.lineplot(data=pd.DataFrame(aveGrads), ax=ax[0])
+
 
 #エントロピー
-ax[1].plot(entropys[:, 0], label="Hue")
-ax[1].plot(entropys[:, 1], label="Saturation")
-ax[1].plot(entropys[:, 2], label="Luminance")
 ax[1].set_title(COLOR_SPACE + " Entropy")
-ax[1].set_xlabel("Iter")
-ax[1].grid(True)
-ax[1].legend(loc="upper right")
+df = pd.DataFrame({"Iter":range(MAX_ITER), "Hue": entropys[:, 0], "Saturation":entropys[:, 1], "Luminance": entropys[:, 2]})
+sns.lineplot(data=df, x="Iter", y="Hue", label="Hue", ax=ax[1])
+sns.lineplot(data=df, x="Iter", y="Saturation", label="Saturation", ax=ax[1])
+sns.lineplot(data=df, x="Iter", y="Luminance", label="Luminance", ax=ax[1])
+
 
 #平均
 ax[2].plot(moments[:, 0], label="Red")
@@ -178,7 +197,6 @@ ax[2].plot(moments[:, 8], label="Blue")
 ax[2].set_title(COLOR_SPACE + " Mean")
 ax[2].set_xlabel("Iter")
 ax[2].set_ylim(0.0, 1.0)
-ax[2].grid(True)
 ax[2].legend(loc="upper right")
 
 #分散
@@ -187,7 +205,6 @@ ax[3].plot(moments[:, 5], label="Green")
 ax[3].plot(moments[:, 9], label="Blue")
 ax[3].set_title(COLOR_SPACE + " Variance")
 ax[3].set_xlabel("Iter")
-ax[3].grid(True)
 ax[3].legend()
 
 #歪度
@@ -196,7 +213,6 @@ ax[4].plot(moments[:, 6], label="Green")
 ax[4].plot(moments[:, 10], label="Blue")
 ax[4].set_title(COLOR_SPACE + " Skweness")
 ax[4].set_xlabel("Iter")
-ax[4].grid(True)
 ax[4].legend()
 
 #尖度
@@ -205,13 +221,11 @@ ax[5].plot(moments[:, 7], label="Green")
 ax[5].plot(moments[:, 11], label="Blue")
 ax[5].set_title(COLOR_SPACE + " kurtosis")
 ax[5].set_xlabel("Iter")
-ax[5].grid(True)
 ax[5].legend()
 
 ax[6].plot(colorDist)
 ax[6].set_title("Euclid Distance from init Img")
 ax[6].set_xlabel("Iter")
-ax[6].grid(True)
 ax[6].legend()
 
 #PSNRは類似度が全く一緒だとlog0-->無限になるため、正規化する際は1つインデックスをずらず
@@ -220,7 +234,7 @@ ax[7].plot(measures[:, 1] / np.max(measures[1:, 1]), label="PSNR(Normed)")
 ax[7].plot(measures[:, 2], label="SSIM")
 ax[7].set_title("Measures")
 ax[7].set_xlabel("Iter")
-ax[7].grid(True)
+
 ax[7].legend()
 
 #plt.tight_layout()
