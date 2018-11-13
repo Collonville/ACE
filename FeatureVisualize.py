@@ -1,25 +1,27 @@
 import sys
 
 import colour
+import cv2
 import matplotlib as mpl
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import seaborn as sns
 import win_unicode_console
 from colour.models import *
 from mpl_toolkits.mplot3d import Axes3D
 from PIL import Image, ImageColor
 from scipy.stats import entropy, kurtosis, skew
-from skimage import filters
-from skimage import data
+from skimage import data, filters
 from skimage.measure import *
 from sklearn.metrics import mean_squared_error
-import pandas as pd
-import seaborn as sns
 
-import cv2
+win_unicode_console.enable()
 
-
+#表示のフォーマットを定義
+np.seterr(all='warn', over='raise')
+np.set_printoptions(precision=8, suppress=True, threshold=np.inf, linewidth=100)
 
 def getColorMoment(img, BIN_NUM=50):
     #www.kki.yamanashi.ac.jp/~ohbuchi/courses/2013/sm2013/pdf/sm13_lect01_20131007.pdf
@@ -111,8 +113,51 @@ def getNaturalness(rgb):
     XYZ = colour.sRGB_to_XYZ(rgb)
     LUV = colour.XYZ_to_Luv(XYZ)
 
+    #彩度と色相の計算(色相は0-2pi-->角度(0-360)に変換)
+    sat = np.sqrt(LUV[:, 1]**2 + LUV[:, 2]**2) / 100
+    hue = np.arctan2(LUV[:, 2], LUV[:, 1])
+    hue[hue < 0] += 2 * np.pi
 
-win_unicode_console.enable()
+    LHS = np.c_[LUV[:, 0], np.rad2deg(hue), sat]
+
+    #Thresolding L and S components
+    LHS = LHS[np.where((LHS[:, 0] >= 20) & (LHS[:, 0] <= 80) & (LHS[:, 2] >= 0.1))]
+
+    #Calcurate average and pixel num of saturation value
+    skin  = LHS[np.where((LHS[:, 1] >= 25 ) & (LHS[:, 1] <= 70 )), 2]
+    grass = LHS[np.where((LHS[:, 1] >= 95 ) & (LHS[:, 1] <= 135)), 2]
+    sky   = LHS[np.where((LHS[:, 1] >= 185) & (LHS[:, 1] <= 260)), 2]
+
+    if(skin.shape[1] == 0):
+        n_skin = 0
+        S_skin = 0
+    else:
+        n_skin = skin.shape[1]
+        S_skin = np.mean(skin)
+
+    if(grass.shape[1] == 0):
+        n_grass = 0
+        S_grass = 0
+    else:   
+        n_grass = grass.shape[1]
+        S_grass = np.mean(grass)
+
+    if(sky.shape[1] == 0):
+        n_sky = 0
+        S_sky = 0
+    else:
+        n_sky = sky.shape[1]
+        S_sky = np.mean(sky)
+
+    #Calcurate local CNI value
+    N_skin = np.power(np.exp(-0.5 * ((S_skin - 0.76) / 0.52)**2), 4)
+    N_grass = np.exp(-0.5 * ((S_grass - 0.81) / 0.53)**2)
+    N_sky = np.exp(-0.5 * ((S_sky - 0.43) / 0.22)**2)
+
+    return (n_skin * N_skin + n_grass * N_grass + n_sky * N_sky) / (n_skin + n_grass + n_sky)
+
+
+
 #------------------------------------------------------------------------
 
 #連続画像から特徴を計算する
@@ -132,6 +177,7 @@ if BY_CONTINUS_IMAGE:
     colorDist = np.zeros(MAX_ITER, dtype='float64')
     measures = np.zeros((MAX_ITER, 3), dtype='float64')
     cf = np.zeros(MAX_ITER, dtype='float64')
+    CNI = np.zeros(MAX_ITER, dtype='float64')
 
     for it in range(MAX_ITER):
         path = "outimg/continuity/" + imgName + "_" + str(it) + ".jpg"
@@ -160,13 +206,16 @@ if BY_CONTINUS_IMAGE:
         colorDist[it] = getDistance(initialImg, rgb)
         measures[it] = getImageMeasure(initialImg, rgb)
         cf[it] = getColourFulness(rgb)
+        CNI[it] = getNaturalness(rgb)
 else:
     feature = np.load("features/" + imgName + "_Features.npy")
     momentFeature = np.load("features/" + imgName + "_MomentFeatures.npy")
 
 #------------------------------------------------------------------------
 #可視化
-sns.lineplot(data=pd.DataFrame(cf))
+df = pd.DataFrame({"Iter":range(MAX_ITER), "Colorfulness": cf, "Naturalness":CNI})
+sns.lineplot(data=df, x="Iter", y="Colorfulness", label="Colorfulness")
+sns.lineplot(data=df, x="Iter", y="Naturalness", label="Naturalness")
 plt.show()
 
 sys.exit()
