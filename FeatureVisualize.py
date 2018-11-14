@@ -85,12 +85,17 @@ def getEntropy(pixels, BIN_NUM=50):
 def getDistance(pixels1, pixels2):
     lab1 = colour.XYZ_to_Lab(colour.sRGB_to_XYZ(pixels1))
     lab2 = colour.XYZ_to_Lab(colour.sRGB_to_XYZ(pixels2))
-    dist = mean_squared_error(lab1, lab2)
+    dist = mean_squared_error(pixels1, pixels2)
 
     #dist = np.sqrt((pixels1[:, 0] - pixels2[:, 0])**2 + (pixels1[:, 1] - pixels2[:, 1])**2 + (pixels1[:, 2] - pixels2[:, 2])**2)
     #dist = np.sum(dist)
 
     return dist
+def getSatDistance(rgb1, rgb2):
+    sat1 = colour.RGB_to_HSL(rgb1)[1]
+    sat2 = colour.RGB_to_HSL(rgb2)[1]
+
+    return mean_squared_error(sat1, sat2)
 
 def getImageMeasure(pixels1, pixels2):
     NRMSE = compare_nrmse(pixels1, pixels2)
@@ -198,6 +203,7 @@ colorfulness = np.zeros(MAX_ITER, dtype='float64')
 naturalness = np.zeros(MAX_ITER, dtype='float64')
 contrast = np.zeros(MAX_ITER, dtype='float64')
 brightness = np.zeros((MAX_ITER, 8), dtype='float64')
+satDist = np.zeros(MAX_ITER, dtype='float64')
 
 for it in range(MAX_ITER):
     path = "outimg/continuity/" + imgName + "_" + str(it) + ".jpg"
@@ -209,7 +215,7 @@ for it in range(MAX_ITER):
     
     #初期画像の保存
     if(it == 0):
-        initialImg = rgb
+        initialRGB = rgb
 
     #色空間の変換
     if COLOR_SPACE is "RGB":
@@ -223,14 +229,15 @@ for it in range(MAX_ITER):
     entropys[it] = getEntropy(pixel)
     moment, cov = getColorMoment(pixel)
     moments[it] = moment
-    colorDist[it] = getDistance(initialImg, rgb)
-    measures[it] = getImageMeasure(initialImg, rgb)
+    colorDist[it] = getDistance(initialRGB, rgb)
+    measures[it] = getImageMeasure(initialRGB, rgb)
 
     SatMeasures[it] = getSaturationMeasure(rgb)
     colorfulness[it] = getColourFulness(rgb)
     naturalness[it] = getNaturalness(rgb)
     contrast[it] = getContasrtMeasure(rgb)
     brightness[it] = getBrightnessMeasure(rgb)
+    satDist[it] = getSatDistance(rgb, initialRGB)
 
 
 #------------------------------------------------------------------------
@@ -273,15 +280,25 @@ ax[2].legend()
 ax[2].set_xlabel("Iter")
 ax[2].set_ylim(0.0, 1.1)
 
-
-#分散
-ax[3].plot(moments[:, 1], label="Red")
-ax[3].plot(moments[:, 5], label="Green")
-ax[3].plot(moments[:, 9], label="Blue")
-ax[3].set_title(COLOR_SPACE + " Variance")
+ax[3].set_title("Y Measure")
+ax[3].plot(brightness[:, 0], label="Measn")
+ax[3].plot(brightness[:, 1], label="Var")
+ax[3].plot(brightness[:, 2], label="Min")
+ax[3].plot(brightness[:, 3], label="Max")
 ax[3].set_xlabel("Iter")
+ax[3].set_ylim(0.0, 1.1)
 ax[3].legend()
 
+ax[4].set_title("L Measure")
+ax[4].plot(brightness[:, 4], label="Mean")
+ax[4].plot(brightness[:, 5], label="Var")
+ax[4].plot(brightness[:, 6], label="Min")
+ax[4].plot(brightness[:, 7], label="Max")
+ax[4].set_xlabel("Iter")
+ax[4].set_ylim(0.0, 1.1)
+ax[4].legend()
+
+'''
 #歪度
 ax[4].plot(moments[:, 2], label="Red")
 ax[4].plot(moments[:, 6], label="Green")
@@ -297,8 +314,15 @@ ax[5].plot(moments[:, 11], label="Blue")
 ax[5].set_title(COLOR_SPACE + " kurtosis")
 ax[5].set_xlabel("Iter")
 ax[5].legend()
+'''
+ax[5].plot(aveGrads + naturalness + 0.8*colorfulness - (1-measures[:, 2]))
 
-ax[6].plot(colorDist)
+ax[5].set_title("Energy")
+ax[5].set_xlabel("Iter")
+ax[5].legend()
+
+ax[6].plot(colorDist, label="RGB")
+ax[6].plot(satDist, label="Satuation")
 ax[6].set_title("Euclid Distance from init Img")
 ax[6].set_xlabel("Iter")
 ax[6].legend()
