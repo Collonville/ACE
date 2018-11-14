@@ -99,6 +99,25 @@ def getImageMeasure(pixels1, pixels2):
     
     return [NRMSE, PSNR, SSIM]
 
+def getBrightnessMeasure(rgb):
+    Y = colour.RGB_to_YCbCr(rgb)[0]
+    lum = colour.RGB_to_HSL(rgb)[2]
+
+    return np.c_[np.mean(Y), np.var(Y), np.min(Y), np.max(Y), np.mean(lum), np.var(lum), np.min(lum), np.max(lum)]
+
+def getContasrtMeasure(rgb):
+    lum = colour.RGB_to_HSL(rgb)[2]
+
+    #正規化
+    lum = (lum - np.min(lum)) / (np.max(lum) - np.min(lum))
+
+    return np.var(lum)
+
+def getSaturationMeasure(rgb):
+    sat = colour.RGB_to_HSL(rgb)[1]
+
+    return np.c_[np.mean(sat), np.var(sat), np.min(sat), np.max(sat)]
+
 #Measuring colourfulness in natural images [D.hasler, S.Susstrunk]
 def getColourFulness(rgb):
     rg = rgb[:, 0] - rgb[:, 1]
@@ -161,92 +180,99 @@ def getNaturalness(rgb):
 #------------------------------------------------------------------------
 
 #連続画像から特徴を計算する
-BY_CONTINUS_IMAGE = True
 COLOR_SPACE = "HSV"
 
 argv = sys.argv
 
 imgName = argv[1]
 
-if BY_CONTINUS_IMAGE:
-    MAX_ITER = 100
+MAX_ITER = 100
 
-    moments = np.zeros((MAX_ITER, 12), dtype='float64')
-    entropys = np.zeros((MAX_ITER, 3), dtype='float64')
-    aveGrads = np.zeros(MAX_ITER, dtype='float64')
-    colorDist = np.zeros(MAX_ITER, dtype='float64')
-    measures = np.zeros((MAX_ITER, 3), dtype='float64')
-    cf = np.zeros(MAX_ITER, dtype='float64')
-    CNI = np.zeros(MAX_ITER, dtype='float64')
+moments = np.zeros((MAX_ITER, 12), dtype='float64')
+entropys = np.zeros((MAX_ITER, 3), dtype='float64')
+aveGrads = np.zeros(MAX_ITER, dtype='float64')
+colorDist = np.zeros(MAX_ITER, dtype='float64')
+measures = np.zeros((MAX_ITER, 3), dtype='float64')
+SatMeasures = np.zeros((MAX_ITER, 4), dtype='float64')
+colorfulness = np.zeros(MAX_ITER, dtype='float64')
+naturalness = np.zeros(MAX_ITER, dtype='float64')
+contrast = np.zeros(MAX_ITER, dtype='float64')
+brightness = np.zeros((MAX_ITER, 8), dtype='float64')
 
-    for it in range(MAX_ITER):
-        path = "outimg/continuity/" + imgName + "_" + str(it) + ".jpg"
-        inputImg = cv2.imread(path, cv2.IMREAD_COLOR)
+for it in range(MAX_ITER):
+    path = "outimg/continuity/" + imgName + "_" + str(it) + ".jpg"
+    inputImg = cv2.imread(path, cv2.IMREAD_COLOR)
 
-        #正規化と整形
-        inputImg = cv2.cvtColor(inputImg, cv2.COLOR_BGR2RGB) / 255.
-        rgb = np.reshape(inputImg, (inputImg.shape[0] * inputImg.shape[1], 3))
-        
-        #初期画像の保存
-        if(it == 0):
-            initialImg = rgb
+    #正規化と整形
+    inputImg = cv2.cvtColor(inputImg, cv2.COLOR_BGR2RGB) / 255.
+    rgb = np.reshape(inputImg, (inputImg.shape[0] * inputImg.shape[1], 3))
+    
+    #初期画像の保存
+    if(it == 0):
+        initialImg = rgb
 
-        #色空間の変換
-        if COLOR_SPACE is "RGB":
-            pixel = rgb
-        elif COLOR_SPACE is "HSV":
-            pixel = colour.RGB_to_HSV(rgb)
-        elif COLOR_SPACE is "HSL":
-            pixel = colour.RGB_to_HSL(rgb)
+    #色空間の変換
+    if COLOR_SPACE is "RGB":
+        pixel = rgb
+    elif COLOR_SPACE is "HSV":
+        pixel = colour.RGB_to_HSV(rgb)
+    elif COLOR_SPACE is "HSL":
+        pixel = colour.RGB_to_HSL(rgb)
 
-        aveGrads[it] = getAveGrad(pixel)
-        entropys[it] = getEntropy(pixel)
-        moment, cov = getColorMoment(pixel)
-        moments[it] = moment
-        colorDist[it] = getDistance(initialImg, rgb)
-        measures[it] = getImageMeasure(initialImg, rgb)
-        cf[it] = getColourFulness(rgb)
-        CNI[it] = getNaturalness(rgb)
-else:
-    feature = np.load("features/" + imgName + "_Features.npy")
-    momentFeature = np.load("features/" + imgName + "_MomentFeatures.npy")
+    aveGrads[it] = getAveGrad(pixel)
+    entropys[it] = getEntropy(pixel)
+    moment, cov = getColorMoment(pixel)
+    moments[it] = moment
+    colorDist[it] = getDistance(initialImg, rgb)
+    measures[it] = getImageMeasure(initialImg, rgb)
+
+    SatMeasures[it] = getSaturationMeasure(rgb)
+    colorfulness[it] = getColourFulness(rgb)
+    naturalness[it] = getNaturalness(rgb)
+    contrast[it] = getContasrtMeasure(rgb)
+    brightness[it] = getBrightnessMeasure(rgb)
+
 
 #------------------------------------------------------------------------
 #可視化
-df = pd.DataFrame({"Iter":range(MAX_ITER), "Colorfulness": cf, "Naturalness":CNI})
-sns.lineplot(data=df, x="Iter", y="Colorfulness", label="Colorfulness")
-sns.lineplot(data=df, x="Iter", y="Naturalness", label="Naturalness")
-plt.show()
-
-sys.exit()
-
-sns.set(style="darkgrid")
+sns.set_style("whitegrid", {'grid.linestyle': '--'})
 fig, axes = plt.subplots(nrows=2, ncols=4)
 ax = axes.ravel()
 
 fig.suptitle('Features of ' + imgName + ".jpg Color Space:" + COLOR_SPACE, fontsize=12, fontweight='bold')
 
 #平均勾配
-ax[0].set_ylim(0.0, 1.0)
-sns.lineplot(data=pd.DataFrame(aveGrads), ax=ax[0])
+ax[0].plot(contrast, label="Contasrt var")
+ax[0].plot(aveGrads, label="Average Gradient")
+ax[0].set_ylim(0.0, 1.1)
+ax[0].set_xlabel("Iter")
+ax[0].legend()
 
+ax[1].set_title("Colorfulness & Naturalness")
+ax[1].plot(colorfulness, label="Colorfulness")
+ax[1].plot(naturalness, label="Naturalness")
+ax[1].plot(colorfulness + naturalness, label="C + N")
+ax[1].set_ylim(0.0, 1.1)
+ax[1].set_xlabel("Iter")
+ax[1].legend()
 
 #エントロピー
+'''
 ax[1].set_title(COLOR_SPACE + " Entropy")
 df = pd.DataFrame({"Iter":range(MAX_ITER), "Hue": entropys[:, 0], "Saturation":entropys[:, 1], "Luminance": entropys[:, 2]})
 sns.lineplot(data=df, x="Iter", y="Hue", label="Hue", ax=ax[1])
 sns.lineplot(data=df, x="Iter", y="Saturation", label="Saturation", ax=ax[1])
 sns.lineplot(data=df, x="Iter", y="Luminance", label="Luminance", ax=ax[1])
-
-
-#平均
-ax[2].plot(moments[:, 0], label="Red")
-ax[2].plot(moments[:, 4], label="Green")
-ax[2].plot(moments[:, 8], label="Blue")
-ax[2].set_title(COLOR_SPACE + " Mean")
+'''
+ax[2].set_title("Saturation Measure")
+ax[2].plot(SatMeasures[:, 0], label="Mean")
+ax[2].plot(SatMeasures[:, 1], label="Var")
+ax[2].plot(SatMeasures[:, 2], label="Min")
+ax[2].plot(SatMeasures[:, 3], label="Max")
+ax[2].legend()
 ax[2].set_xlabel("Iter")
-ax[2].set_ylim(0.0, 1.0)
-ax[2].legend(loc="upper right")
+ax[2].set_ylim(0.0, 1.1)
+
 
 #分散
 ax[3].plot(moments[:, 1], label="Red")
@@ -283,8 +309,8 @@ ax[7].plot(measures[:, 1] / np.max(measures[1:, 1]), label="PSNR(Normed)")
 ax[7].plot(measures[:, 2], label="SSIM")
 ax[7].set_title("Measures")
 ax[7].set_xlabel("Iter")
-
 ax[7].legend()
+
 
 #plt.tight_layout()
 plt.show()
