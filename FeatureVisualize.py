@@ -205,7 +205,6 @@ naturalness = np.zeros(MAX_ITER, dtype='float64')
 contrast = np.zeros(MAX_ITER, dtype='float64')
 brightness = np.zeros((MAX_ITER, 8), dtype='float64')
 satDist = np.zeros(MAX_ITER, dtype='float64')
-satHist = []
 
 for it in range(MAX_ITER):
     path = "outimg/continuity/" + imgName + "_" + str(it) + ".jpg"
@@ -263,8 +262,9 @@ ax[0].set_xlabel("Iter")
 ax[0].legend()
 
 ax[1].set_title("Colorfulness & Naturalness")
-ax[1].plot(colorfulness / np.max(colorfulness), label="Colorfulness")
+ax[1].plot(colorfulness, label="Colorfulness")
 ax[1].plot(naturalness, label="Naturalness")
+ax[1].plot(colorfulness + naturalness, label="C + N")
 ax[1].set_ylim(0.0, 1.1)
 ax[1].set_xlabel("Iter")
 ax[1].legend()
@@ -321,7 +321,7 @@ ax[5].set_title(COLOR_SPACE + " kurtosis")
 ax[5].set_xlabel("Iter")
 ax[5].legend()
 '''
-ax[5].plot(aveGrads + naturalness + colorfulness)
+ax[5].plot(aveGrads + naturalness + 0.8*colorfulness - (1-measures[:, 2]))
 
 ax[5].set_title("Energy")
 ax[5].set_xlabel("Iter")
