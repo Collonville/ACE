@@ -130,9 +130,9 @@ def getColourFulness(rgb):
     yb = 0.5 * (rgb[:, 0] + rgb[:, 1]) - rgb[:, 2]
 
     mean_rgyb = np.sqrt(np.mean(rg)**2 + np.mean(yb)**2)
-    var_rgyb = np.sqrt(np.var(rg)**2 + np.var(yb)**2)
+    std_rgyb = np.sqrt(np.std(rg)**2 + np.std(yb)**2)
 
-    return var_rgyb + 0.3 * mean_rgyb
+    return std_rgyb + 0.3 * mean_rgyb
 
 def getNaturalness(rgb):
     XYZ = colour.sRGB_to_XYZ(rgb)
@@ -263,9 +263,8 @@ ax[0].set_xlabel("Iter")
 ax[0].legend()
 
 ax[1].set_title("Colorfulness & Naturalness")
-ax[1].plot(colorfulness, label="Colorfulness")
+ax[1].plot(colorfulness / np.max(colorfulness), label="Colorfulness")
 ax[1].plot(naturalness, label="Naturalness")
-ax[1].plot(colorfulness + naturalness, label="C + N")
 ax[1].set_ylim(0.0, 1.1)
 ax[1].set_xlabel("Iter")
 ax[1].legend()
@@ -322,7 +321,7 @@ ax[5].set_title(COLOR_SPACE + " kurtosis")
 ax[5].set_xlabel("Iter")
 ax[5].legend()
 '''
-ax[5].plot(aveGrads + naturalness + 0.8*colorfulness - (1-measures[:, 2]))
+ax[5].plot(aveGrads + naturalness + colorfulness)
 
 ax[5].set_title("Energy")
 ax[5].set_xlabel("Iter")
