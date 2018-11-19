@@ -91,9 +91,10 @@ def getDistance(pixels1, pixels2):
     #dist = np.sum(dist)
 
     return dist
+
 def getSatDistance(rgb1, rgb2):
-    sat1 = colour.RGB_to_HSL(rgb1)[1]
-    sat2 = colour.RGB_to_HSL(rgb2)[1]
+    sat1 = colour.RGB_to_HSL(rgb1)[:, 1]
+    sat2 = colour.RGB_to_HSL(rgb2)[:, 1]
 
     return mean_squared_error(sat1, sat2)
 
@@ -105,13 +106,13 @@ def getImageMeasure(pixels1, pixels2):
     return [NRMSE, PSNR, SSIM]
 
 def getBrightnessMeasure(rgb):
-    Y = colour.RGB_to_YCbCr(rgb)[0]
-    lum = colour.RGB_to_HSL(rgb)[2]
+    Y = colour.RGB_to_YCbCr(rgb)[:, 0]
+    lum = colour.RGB_to_HSL(rgb)[:, 2]
 
     return np.c_[np.mean(Y), np.var(Y), np.min(Y), np.max(Y), np.mean(lum), np.var(lum), np.min(lum), np.max(lum)]
 
 def getContasrtMeasure(rgb):
-    lum = colour.RGB_to_HSL(rgb)[2]
+    lum = colour.RGB_to_HSL(rgb)[:, 2]
 
     #正規化
     lum = (lum - np.min(lum)) / (np.max(lum) - np.min(lum))
@@ -119,7 +120,7 @@ def getContasrtMeasure(rgb):
     return np.var(lum)
 
 def getSaturationMeasure(rgb):
-    sat = colour.RGB_to_HSL(rgb)[1]
+    sat = colour.RGB_to_HSL(rgb)[:, 1]
 
     return np.c_[np.mean(sat), np.var(sat), np.min(sat), np.max(sat)]
 
@@ -204,6 +205,7 @@ naturalness = np.zeros(MAX_ITER, dtype='float64')
 contrast = np.zeros(MAX_ITER, dtype='float64')
 brightness = np.zeros((MAX_ITER, 8), dtype='float64')
 satDist = np.zeros(MAX_ITER, dtype='float64')
+satHist = []
 
 for it in range(MAX_ITER):
     path = "outimg/continuity/" + imgName + "_" + str(it) + ".jpg"
@@ -239,6 +241,11 @@ for it in range(MAX_ITER):
     brightness[it] = getBrightnessMeasure(rgb)
     satDist[it] = getSatDistance(rgb, initialRGB)
 
+    '''
+    if(it % 5 == 0):
+        plt.hist(colour.RGB_to_HSV(rgb)[:, 1], bins=100)
+        plt.show()
+    '''
 
 #------------------------------------------------------------------------
 #可視化
