@@ -27,10 +27,8 @@ from scipy.stats import kurtosis, skew
 
 win_unicode_console.enable()
 
-np.seterr(all='warn', over='raise')
-
 #表示のフォーマットを定義
-np.set_printoptions(precision=8, suppress=True, threshold=np.inf, linewidth=100)
+np.set_printoptions(precision=10, suppress=True, threshold=np.inf, linewidth=100)
 
 @numba.jit('f8[:](f8[:], f8[:], i8, i8, f4)')
 def RIslow(omega, I, width, height, alpha):
@@ -104,6 +102,22 @@ def ICH2ITP(ICH):
 
     return np.c_[ICH[:, 0], T, P]
 
+def optimaizeFunc(rgb):
+    r, g, b = np.split(rgb, 3)
+
+    return 0.5 * np.sum((ITPHue(r, g, b) - imgHue)**2)
+
+def optimaizeFuncGradient(rgb):
+    r, g, b = np.split(rgb, 3)
+
+    hueDiff = ITPHue(r, g, b) - imgHue
+
+    rPrime = hueDiff * np.asarray(HRedPartial(r, g, b), dtype='float64').T
+    gPrime = hueDiff * np.asarray(HGrePartial(r, g, b), dtype='float64').T
+    bPrime = hueDiff * np.asarray(HBluPartial(r, g, b), dtype='float64').T
+
+    return np.r_[rPrime, gPrime, bPrime]
+
 #Sympyのシンボル定義
 r, g, b = symbols("r g b")
 r_, g_, b_ = symbols("r_ g_ b_")
@@ -159,14 +173,13 @@ ITP2RGB = lambdify((I_, T_, P_), (ITP2RGB[0].subs([(I, I_), (T, T_), (P, P_)]), 
 #rgb --> ITPへ変換する式の整理版
 #print(N(radsimp(LMS2ITP_Mat, 3)))
 
-
 #------------------------------------------------------------------------
 fileName = "wool"
 inputImgPath = "img/" + fileName + ".jpg"
-outputImgPath = "outimg/continuity/" + fileName
-doSignalConvert = False
-doHueCorrection = False
-OUT_CONSECUTIVE_IMG = True
+outputImgPath = "outimg/continuity_hue/" + fileName
+doSignalConvert = False    #LED制御値補正
+doHueCorrection = True     #色相補正
+OUT_CONSECUTIVE_IMG = True #連続画像作成
 
 #Pathに日本語が含まれるとエラー
 inputImg = cv2.imread(inputImgPath, cv2.IMREAD_COLOR)
@@ -194,22 +207,7 @@ alpha = np.abs(gamma) / 20
 beta = 1
 
 ratio = 0.5
-
-def optimaizeFunc(rgb):
-    r, g, b = np.split(rgb, 3)
-
-    return 0.5 * np.sum((ITPHue(r, g, b) - imgHue)**2)
-
-def optimaizeFuncGradient(rgb):
-    r, g, b = np.split(rgb, 3)
-
-    hueDiff = ITPHue(r, g, b) - imgHue
-
-    rPrime = hueDiff * np.asarray(HRedPartial(r, g, b), dtype='float64').T
-    gPrime = hueDiff * np.asarray(HGrePartial(r, g, b), dtype='float64').T
-    bPrime = hueDiff * np.asarray(HBluPartial(r, g, b), dtype='float64').T
-
-    return np.r_[rPrime, gPrime, bPrime]
+lossBefore = 0
 
 MAX_ITER = 100
 feature = np.zeros((MAX_ITER, 4), dtype='float64')
@@ -220,7 +218,7 @@ for it in range(MAX_ITER):
 
     rgbBefore = np.zeros((inputImg.shape[0] * inputImg.shape[1], 3), dtype='float64')
     
-    for k in range(4000):
+    for k in range(2000):
         #エンハンス
         for colorCh in range(3):
             contrast = RIslow(omegaFFT, mappedImg[:, colorCh], inputImg.shape[0], inputImg.shape[1], alpha)
@@ -235,7 +233,7 @@ for it in range(MAX_ITER):
             #最適化
             hueOpt = minimize(optimaizeFunc, mappedImg.flatten('F'), 
                                 method='CG',  
-                                options={'gtol': 1e-6, 'disp': False},
+                                options={'gtol': 1e-5, 'disp': False},
                                 jac=optimaizeFuncGradient
                             )
 
@@ -248,20 +246,23 @@ for it in range(MAX_ITER):
 
         if doHueCorrection:
             allLoss = ratio * enhanceLoss + (1 - ratio) * hueLoss
-            print("Iter:%2d, k:%4d, All Loss=%f, Enhance Loss=%f, Hue Loss=%f" % (it, k, allLoss, enhanceLoss, hueLoss))
-
-            if allLoss < 1e-4:
+            loss = np.abs(allLoss - lossBefore)
+            print("Iter:%2d, k:%4d, All Loss=%f, Enhance Loss=%f, Hue Loss=%f" % (it, k, loss, enhanceLoss, hueLoss))
+            
+            if loss < 1e-4:
                 break
             else:
+                lossBefore = allLoss
                 rgbBefore = copy.deepcopy(mappedImg)
         else:
             if enhanceLoss < 1e-5:
                 print("Iter:%2d, Enhance Loss=%f" % (k, enhanceLoss))
                 break
             else:
-                rgbBefore = np.copy(mappedImg)
+                rgbBefore = np.deepcopy(mappedImg)
 
-    if (it % 1) == 0 and OUT_CONSECUTIVE_IMG:
+
+    if OUT_CONSECUTIVE_IMG:
         img_ = np.clip(mappedImg, 0, 1)
         im = Image.fromarray(np.uint8(img_.reshape((inputImg.shape[0], inputImg.shape[1], 3)) * 255))
         im.save(outputImgPath + "_" + str(it) + ".jpg", quality=100)
