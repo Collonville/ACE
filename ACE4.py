@@ -161,7 +161,7 @@ ITP2RGB = lambdify((I_, T_, P_), (ITP2RGB[0].subs([(I, I_), (T, T_), (P, P_)]), 
 
 
 #------------------------------------------------------------------------
-fileName = "strawberry"
+fileName = "wool"
 inputImgPath = "img/" + fileName + ".jpg"
 outputImgPath = "outimg/continuity/" + fileName
 doSignalConvert = False
@@ -210,65 +210,6 @@ def optimaizeFuncGradient(rgb):
     bPrime = hueDiff * np.asarray(HBluPartial(r, g, b), dtype='float64').T
 
     return np.r_[rPrime, gPrime, bPrime]
-
-def colorMoment(img):
-    #www.kki.yamanashi.ac.jp/~ohbuchi/courses/2013/sm2013/pdf/sm13_lect01_20131007.pdf
-    img = np.clip(img, 0, 1)
-
-    rChannel = img[:, 0]
-    gChannel = img[:, 1]
-    bChannel = img[:, 2]
-
-    #平均
-    rMean = np.mean(rChannel)
-    gMean = np.mean(gChannel)
-    bMean = np.mean(bChannel)
-
-    #分散
-    rVar = np.var(rChannel)
-    gVar = np.var(gChannel)
-    bVar = np.var(bChannel)
-
-    #共分散
-    #bias=True:画素数で割る、rowvar=False:各チャンネルが列に並んでいるため
-    rgbCov = np.cov(img, bias=True, rowvar=False)
-
-    #歪度
-    rSkew = skew(rChannel)
-    gSkew = skew(gChannel)
-    bSkew = skew(bChannel)
-
-    #尖度
-    rKurt = kurtosis(rChannel)
-    gKurt = kurtosis(gChannel)
-    bKurt = kurtosis(bChannel)
-
-    rMoment = [rMean, rVar, rSkew, rKurt]
-    gMoment = [gMean, gVar, gSkew, gKurt]
-    bMoment = [bMean, bVar, bSkew, bKurt]
-
-    return np.r_[rMoment, gMoment, bMoment], rgbCov
-
-def getFeature(img):
-    img = np.clip(img, 0, 1)
-    img_reshaped = img.reshape((inputImg.shape[0], inputImg.shape[1], 3))
-
-    #勾配値情報
-    redGrad = filters.sobel(img_reshaped[:, :, 0])
-    greGrad = filters.sobel(img_reshaped[:, :, 1])
-    bluGrad = filters.sobel(img_reshaped[:, :, 2])
-    imgGrad = np.sqrt(redGrad**2 + greGrad**2 + bluGrad**2)
-    aveGrad = np.sum(imgGrad) / (img_reshaped.shape[0] * img_reshaped.shape[1])
-
-    #エントロピー情報
-    BIN_NUM = 50
-    hsl = colour.RGB_to_HSL(img)
-
-    hueEntropy = entropy(np.histogram(hsl[:, 0].flatten(), bins=BIN_NUM)[0], base=2)
-    satEntropy = entropy(np.histogram(hsl[:, 1].flatten(), bins=BIN_NUM)[0], base=2)
-    lumEntropy = entropy(np.histogram(hsl[:, 2].flatten(), bins=BIN_NUM)[0], base=2)
-
-    return np.r_[aveGrad, hueEntropy, satEntropy, lumEntropy]
 
 MAX_ITER = 100
 feature = np.zeros((MAX_ITER, 4), dtype='float64')
@@ -320,10 +261,6 @@ for it in range(MAX_ITER):
             else:
                 rgbBefore = np.copy(mappedImg)
 
-    moment, rgbCov = colorMoment(mappedImg)
-    momentFeature[it] = moment
-    feature[it] = getFeature(mappedImg)
-
     if (it % 1) == 0 and OUT_CONSECUTIVE_IMG:
         img_ = np.clip(mappedImg, 0, 1)
         im = Image.fromarray(np.uint8(img_.reshape((inputImg.shape[0], inputImg.shape[1], 3)) * 255))
@@ -346,60 +283,6 @@ if doSignalConvert:
     mappedImg = np.array(signal)
 
 #------------------------------------------------------------------------
-#特徴量の保存
-np.save("features/" + fileName + "_Features", feature)
-np.save("features/" + fileName + "_MomentFeatures", momentFeature)
-
-#------------------------------------------------------------------------
-#特徴量の可視化
-fig, axes = plt.subplots(nrows=2, ncols=3)
-ax = axes.ravel()
-
-ax[0].plot(feature[:, 0], label="Average Gradient")
-ax[0].grid(True)
-ax[0].legend()
-ax[0].set_xlabel("Iter")
-
-ax[1].plot(feature[:, 1], label="Hue Entropy")
-ax[1].plot(feature[:, 2], label="Saturation Entropy")
-ax[1].plot(feature[:, 3], label="Luminance Entropy")
-ax[1].set_xlabel("Iter")
-ax[1].grid(True)
-ax[1].legend(loc="upper right")
-
-ax[2].plot(momentFeature[:, 0], label="Red Mean")
-ax[2].plot(momentFeature[:, 4], label="Green Mean")
-ax[2].plot(momentFeature[:, 8], label="Blue Mean")
-ax[2].set_xlabel("Iter")
-ax[2].grid(True)
-ax[2].legend(loc="upper right")
-
-ax[3].plot(momentFeature[:, 1], label="Red Variance")
-ax[3].plot(momentFeature[:, 5], label="Green Variance")
-ax[3].plot(momentFeature[:, 9], label="Blue Variance")
-ax[3].set_xlabel("Iter")
-ax[3].grid(True)
-ax[3].legend(loc="upper right")
-
-ax[4].plot(momentFeature[:, 2], label="Red Skweness")
-ax[4].plot(momentFeature[:, 6], label="Green Skweness")
-ax[4].plot(momentFeature[:, 10], label="Blue Skweness")
-ax[4].set_xlabel("Iter")
-ax[4].grid(True)
-ax[4].legend(loc="upper right")
-
-ax[5].plot(momentFeature[:, 3], label="Red kurtosis")
-ax[5].plot(momentFeature[:, 7], label="Green Kurtosis")
-ax[5].plot(momentFeature[:, 11], label="Blue Kurtosis")
-ax[5].set_xlabel("Iter")
-ax[5].grid(True)
-ax[5].legend(loc="upper right")
-
-plt.show()
-
-np.save(fileName + "_Featers", feature)
-np.save(fileName + "_MomentFeaters", momentFeature)
-sys.exit()
 
 #(H,W,3)に整形とクリップ処理
 mappedImg = np.clip(mappedImg.reshape((inputImg.shape[0], inputImg.shape[1], 3)), 0, 1)
