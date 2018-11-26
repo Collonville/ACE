@@ -181,6 +181,70 @@ def getNaturalness(rgb):
 
     return (n_skin * N_skin + n_grass * N_grass + n_sky * N_sky) / (n_skin + n_grass + n_sky)
 
+#A new universal colour image fidelity metric
+#x:Original Image, y:Processed Image, 1 channel
+def FidelityMetric(x, y):
+    xMean = np.mean(x)
+    yMean = np.mean(y)
+
+    #不偏分散
+    xVar = np.var(x, ddof=1)
+    yVar = np.var(y, ddof=1)
+
+    xyCov = np.cov(x, y, ddof=1)[0, 0]
+
+    Q1 = xyCov / (np.sqrt(xVar) * np.sqrt(yVar))
+    Q2 = (2 * xMean * yMean) / (xMean**2 + yMean**2)
+    Q3 = (2 * np.sqrt(xVar) * np.sqrt(yVar)) / (xVar + yVar)
+
+    return (Q1 * Q2 * Q3)
+
+
+def SlidingWindow(imgX, imgY, stepSize, windowSize):
+    for y in range(0, inputImg.shape[0], stepSize):
+        for x in range(0, inputImg.shape[1], stepSize):
+            yield imgX[y: y + windowSize, x: x + windowSize, :], imgY[y: y + windowSize, x: x + windowSize, :]
+
+
+def ColorFidelityMetric(rgbX, rgbY):
+    M = 0
+    Q = 0
+
+    #W * H * 3に変形
+    rgbX_ = np.reshape(rgbX, (inputImg.shape[0], inputImg.shape[1], 3))
+    rgbY_ = np.reshape(rgbY, (inputImg.shape[0], inputImg.shape[1], 3))
+
+    #RGB-->Lab
+    XYZ_X = colour.sRGB_to_XYZ(rgbX_)
+    XYZ_Y = colour.sRGB_to_XYZ(rgbY_)
+    Lab_X = colour.XYZ_to_Lab(XYZ_X)
+    Lab_Y = colour.XYZ_to_Lab(XYZ_Y)
+
+    #ウィンドウサイズごとのFidelityMetricを計算
+    for (cropX, cropY) in SlidingWindow(Lab_X, Lab_Y, 1, 8):
+        # if the window does not meet our desired window size, ignore it
+        if cropX.shape[0] != 8 or cropX.shape[1] != 8:
+            continue 
+
+        #オリジナル画像のクリップ
+        cropL_X = cropX[:, :, 0].flatten()
+        cropa_X = cropX[:, :, 1].flatten()
+        cropb_X = cropX[:, :, 2].flatten()
+
+        #加工画像のクリップ
+        cropL_Y = cropY[:, :, 0].flatten()
+        cropa_Y = cropY[:, :, 1].flatten()
+        cropb_Y = cropY[:, :, 2].flatten()
+
+        Ql = FidelityMetric(cropL_X, cropL_Y)
+        Qa = FidelityMetric(cropa_X, cropa_Y)
+        Qb = FidelityMetric(cropb_X, cropb_Y)
+
+        Q += np.sqrt(Ql**2 + Qa**2 + Qb**2)
+
+        M = M + 1
+
+    return Q / M
 
 
 #------------------------------------------------------------------------
@@ -207,7 +271,7 @@ brightness = np.zeros((MAX_ITER, 8), dtype='float64')
 satDist = np.zeros(MAX_ITER, dtype='float64')
 
 for it in range(MAX_ITER):
-    path = "outimg/continuity/" + imgName + "_" + str(it) + ".jpg"
+    path = "outimg/continuity_hue/" + imgName + "_" + str(it) + ".jpg"
     inputImg = cv2.imread(path, cv2.IMREAD_COLOR)
 
     #正規化と整形
@@ -264,7 +328,6 @@ ax[0].legend()
 ax[1].set_title("Colorfulness & Naturalness")
 ax[1].plot(colorfulness, label="Colorfulness")
 ax[1].plot(naturalness, label="Naturalness")
-ax[1].plot(colorfulness + naturalness, label="C + N")
 ax[1].set_ylim(0.0, 1.1)
 ax[1].set_xlabel("Iter")
 ax[1].legend()
@@ -321,7 +384,7 @@ ax[5].set_title(COLOR_SPACE + " kurtosis")
 ax[5].set_xlabel("Iter")
 ax[5].legend()
 '''
-ax[5].plot(aveGrads + naturalness + 0.8*colorfulness - (1-measures[:, 2]))
+ax[5].plot(aveGrads + naturalness + colorfulness - (1-measures[:, 2]))
 
 ax[5].set_title("Energy")
 ax[5].set_xlabel("Iter")
