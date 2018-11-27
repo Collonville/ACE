@@ -11,7 +11,6 @@ import seaborn as sns
 import win_unicode_console
 from colour.models import *
 from mpl_toolkits.mplot3d import Axes3D
-from PIL import Image, ImageColor
 from scipy.stats import entropy, kurtosis, skew
 from skimage import data, filters
 from skimage.measure import *
@@ -269,9 +268,10 @@ naturalness = np.zeros(MAX_ITER, dtype='float64')
 contrast = np.zeros(MAX_ITER, dtype='float64')
 brightness = np.zeros((MAX_ITER, 8), dtype='float64')
 satDist = np.zeros(MAX_ITER, dtype='float64')
+CFM = np.zeros(MAX_ITER, dtype='float64')
 
 for it in range(MAX_ITER):
-    path = "outimg/continuity_hue/" + imgName + "_" + str(it) + ".jpg"
+    path = "outimg/continuity_hue/Natural/" + imgName + "_" + str(it) + ".jpg"
     inputImg = cv2.imread(path, cv2.IMREAD_COLOR)
 
     #正規化と整形
@@ -303,12 +303,7 @@ for it in range(MAX_ITER):
     contrast[it] = getContasrtMeasure(rgb)
     brightness[it] = getBrightnessMeasure(rgb)
     satDist[it] = getSatDistance(rgb, initialRGB)
-
-    '''
-    if(it % 5 == 0):
-        plt.hist(colour.RGB_to_HSV(rgb)[:, 1], bins=100)
-        plt.show()
-    '''
+    CFM[it] = ColorFidelityMetric(initialRGB, rgb)
 
 #------------------------------------------------------------------------
 #可視化
@@ -390,9 +385,16 @@ ax[5].set_title("Energy")
 ax[5].set_xlabel("Iter")
 ax[5].legend()
 
+'''
 ax[6].plot(colorDist, label="RGB")
 ax[6].plot(satDist, label="Satuation")
 ax[6].set_title("Euclid Distance from init Img")
+ax[6].set_xlabel("Iter")
+ax[6].legend()
+'''
+print(CFM)
+ax[6].plot(CFM, label="RGB")
+ax[6].set_title("CFM")
 ax[6].set_xlabel("Iter")
 ax[6].legend()
 
