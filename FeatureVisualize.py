@@ -175,7 +175,7 @@ def getNaturalness(rgb):
         S_sky = np.mean(sky)
 
     #Calcurate local CNI value
-    N_skin = np.power(np.exp(-0.5 * ((S_skin - 0.76) / 0.52)**2), 4)
+    N_skin = np.power(np.exp(-0.5 * ((S_skin - 0.76) / 0.52)**2), 2)
     N_grass = np.exp(-0.5 * ((S_grass - 0.81) / 0.53)**2)
     N_sky = np.exp(-0.5 * ((S_sky - 0.43) / 0.22)**2)
 
@@ -207,7 +207,7 @@ brightness = np.zeros((MAX_ITER, 8), dtype='float64')
 satDist = np.zeros(MAX_ITER, dtype='float64')
 
 for it in range(MAX_ITER):
-    path = "outimg/continuity/" + imgName + "_" + str(it) + ".jpg"
+    path = "outimg/continuity_hue/" + imgName + "_" + str(it) + ".jpg"
     inputImg = cv2.imread(path, cv2.IMREAD_COLOR)
 
     #正規化と整形
@@ -261,10 +261,12 @@ ax[0].set_ylim(0.0, 1.1)
 ax[0].set_xlabel("Iter")
 ax[0].legend()
 
+w = 0.75
+Q = w * naturalness + (1 - w) * colorfulness / np.max(colorfulness)
 ax[1].set_title("Colorfulness & Naturalness")
 ax[1].plot(colorfulness, label="Colorfulness")
 ax[1].plot(naturalness, label="Naturalness")
-ax[1].plot(colorfulness + naturalness, label="C + N")
+ax[1].plot(Q, label="C + N")
 ax[1].set_ylim(0.0, 1.1)
 ax[1].set_xlabel("Iter")
 ax[1].legend()
@@ -321,7 +323,7 @@ ax[5].set_title(COLOR_SPACE + " kurtosis")
 ax[5].set_xlabel("Iter")
 ax[5].legend()
 '''
-ax[5].plot(aveGrads + naturalness + 0.8*colorfulness - (1-measures[:, 2]))
+ax[5].plot(aveGrads + Q )
 
 ax[5].set_title("Energy")
 ax[5].set_xlabel("Iter")

@@ -1,4 +1,5 @@
 import copy
+import glob
 import itertools
 import math
 import sys
@@ -21,9 +22,8 @@ from skimage import filters
 from sklearn.metrics import mean_squared_error
 from sympy import *
 from sympy.matrices import *
-from scipy.stats import entropy
+
 import cv2
-from scipy.stats import kurtosis, skew
 
 win_unicode_console.enable()
 
@@ -174,9 +174,9 @@ ITP2RGB = lambdify((I_, T_, P_), (ITP2RGB[0].subs([(I, I_), (T, T_), (P, P_)]), 
 #print(N(radsimp(LMS2ITP_Mat, 3)))
 
 #------------------------------------------------------------------------
-fileName = "wool"
-inputImgPath = "img/" + fileName + ".jpg"
-outputImgPath = "outimg/continuity_hue/" + fileName
+fileName = "s1306_9"
+inputImgPath = "img/Illust/" + fileName + ".jpg"
+outputImgPath = "outimg/continuity_hue/Illust/" + fileName
 doSignalConvert = False    #LED制御値補正
 doHueCorrection = True     #色相補正
 OUT_CONSECUTIVE_IMG = True #連続画像作成
@@ -218,7 +218,7 @@ for it in range(MAX_ITER):
 
     rgbBefore = np.zeros((inputImg.shape[0] * inputImg.shape[1], 3), dtype='float64')
     
-    for k in range(2000):
+    for k in range(100):
         #エンハンス
         for colorCh in range(3):
             contrast = RIslow(omegaFFT, mappedImg[:, colorCh], inputImg.shape[0], inputImg.shape[1], alpha)
