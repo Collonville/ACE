@@ -22,7 +22,7 @@ win_unicode_console.enable()
 
 #表示のフォーマットを定義
 np.seterr(all='warn', over='raise')
-np.set_printoptions(precision=8, suppress=True, threshold=np.inf, linewidth=100)
+np.set_printoptions(precision=8, suppress=True, threshold=np.inf, linewidth=150)
 
 def getColorMoment(img, BIN_NUM=50):
     #www.kki.yamanashi.ac.jp/~ohbuchi/courses/2013/sm2013/pdf/sm13_lect01_20131007.pdf
@@ -59,7 +59,7 @@ def getColorMoment(img, BIN_NUM=50):
     gMoment = [gMean, gVar, gSkew, gKurt]
     bMoment = [bMean, bVar, bSkew, bKurt]
 
-    return np.r_[rMoment, gMoment, bMoment], rgbCov
+    return np.r_[rMoment, gMoment, bMoment], rgbCov.flatten()
 
 def getAveGrad(pixels):
     #勾配値情報
@@ -110,7 +110,7 @@ def getBrightnessMeasure(rgb):
     Y = colour.RGB_to_YCbCr(rgb)[:, 0]
     lum = colour.RGB_to_HSL(rgb)[:, 2]
 
-    return np.c_[np.mean(Y), np.var(Y), np.min(Y), np.max(Y), np.mean(lum), np.var(lum), np.min(lum), np.max(lum)]
+    return np.r_[np.mean(Y), np.var(Y), np.min(Y), np.max(Y), np.mean(lum), np.var(lum), np.min(lum), np.max(lum)]
 
 def getContasrtMeasure(rgb):
     lum = colour.RGB_to_HSL(rgb)[:, 2]
@@ -123,7 +123,7 @@ def getContasrtMeasure(rgb):
 def getSaturationMeasure(rgb):
     sat = colour.RGB_to_HSL(rgb)[:, 1]
 
-    return np.c_[np.mean(sat), np.var(sat), np.min(sat), np.max(sat)]
+    return np.r_[np.mean(sat), np.var(sat), np.min(sat), np.max(sat)]
 
 #Measuring colourfulness in natural images [D.hasler, S.Susstrunk]
 def getColourFulness(rgb):
@@ -206,7 +206,6 @@ def SlidingWindow(imgX, imgY, stepSize, windowSize):
         for x in range(0, inputImg.shape[1], stepSize):
             yield imgX[y: y + windowSize, x: x + windowSize, :], imgY[y: y + windowSize, x: x + windowSize, :]
 
-
 def ColorFidelityMetric(rgbX, rgbY):
     M = 0
     Q = 0
@@ -255,56 +254,31 @@ def numericalSort(value):
 
 #------------------------------------------------------------------------
 #globだけではファイルの順列は保証されないためkey=numericalSortを用いる
-imageData = sorted(glob.glob('outimg\continuity_hue\All\*.jpg'), key=numericalSort)
+imagesPath = sorted(glob.glob('outimg/continuity_hue/test/*.jpg'), key=numericalSort)
 
-for fileName in imageData:
-    print(fileName)
+di={}
 
-sys.exit()
-
-moments = np.zeros((MAX_ITER, 12), dtype='float64')
-entropys = np.zeros((MAX_ITER, 3), dtype='float64')
-aveGrads = np.zeros(MAX_ITER, dtype='float64')
-colorDist = np.zeros(MAX_ITER, dtype='float64')
-measures = np.zeros((MAX_ITER, 3), dtype='float64')
-SatMeasures = np.zeros((MAX_ITER, 4), dtype='float64')
-colorfulness = np.zeros(MAX_ITER, dtype='float64')
-naturalness = np.zeros(MAX_ITER, dtype='float64')
-contrast = np.zeros(MAX_ITER, dtype='float64')
-brightness = np.zeros((MAX_ITER, 8), dtype='float64')
-satDist = np.zeros(MAX_ITER, dtype='float64')
-CFM = np.zeros(MAX_ITER, dtype='float64')
-
-for fileName in imageData:
+for fileName in imagesPath:
     inputImg = cv2.imread(fileName, cv2.IMREAD_COLOR)
 
     #正規化と整形
     inputImg = cv2.cvtColor(inputImg, cv2.COLOR_BGR2RGB) / 255.
     rgb = np.reshape(inputImg, (inputImg.shape[0] * inputImg.shape[1], 3))
-    
-    #初期画像の保存
-    if(it == 0):
-        initialRGB = rgb
 
-    #色空間の変換
-    if COLOR_SPACE is "RGB":
-        pixel = rgb
-    elif COLOR_SPACE is "HSV":
-        pixel = colour.RGB_to_HSV(rgb)
-    elif COLOR_SPACE is "HSL":
-        pixel = colour.RGB_to_HSL(rgb)
+    moment, cov = getColorMoment(rgb)
+    aveGrads = getAveGrad(rgb)
+    brightness = getBrightnessMeasure(rgb)
+    contrast = getContasrtMeasure(rgb)
+    SatMeasures = getSaturationMeasure(rgb)
+    colorfulness = getColourFulness(rgb)
+    naturalness = getNaturalness(rgb)
 
-    aveGrads[it] = getAveGrad(pixel)
-    entropys[it] = getEntropy(pixel)
-    moment, cov = getColorMoment(pixel)
-    moments[it] = moment
-    colorDist[it] = getDistance(initialRGB, rgb)
-    measures[it] = getImageMeasure(initialRGB, rgb)
+    allFeatures = np.r_[moment, cov, aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]
 
-    SatMeasures[it] = getSaturationMeasure(rgb)
-    colorfulness[it] = getColourFulness(rgb)
-    naturalness[it] = getNaturalness(rgb)
-    contrast[it] = getContasrtMeasure(rgb)
-    brightness[it] = getBrightnessMeasure(rgb)
-    satDist[it] = getSatDistance(rgb, initialRGB)
-    CFM[it] = ColorFidelityMetric(initialRGB, rgb)
+    #辞書型でファイル名と特徴量を紐づけ
+    di[fileName] = allFeatures
+
+
+
+print(di)
+
