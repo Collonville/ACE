@@ -4,12 +4,7 @@ import sys
 
 import colour
 import cv2
-import matplotlib as mpl
-import matplotlib.cm as cm
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import seaborn as sns
 import win_unicode_console
 from colour.models import *
 from mpl_toolkits.mplot3d import Axes3D
@@ -59,7 +54,7 @@ def getColorMoment(img, BIN_NUM=50):
     gMoment = [gMean, gVar, gSkew, gKurt]
     bMoment = [bMean, bVar, bSkew, bKurt]
 
-    return np.r_[rMoment, gMoment, bMoment], rgbCov.flatten()
+    return np.r_[rMoment, gMoment, bMoment], rgbCov
 
 def getAveGrad(pixels):
     #勾配値情報
@@ -273,7 +268,7 @@ for fileName in imagesPath:
     colorfulness = getColourFulness(rgb)
     naturalness = getNaturalness(rgb)
 
-    allFeatures = np.r_[moment, cov, aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]
+    allFeatures = np.r_[moment, cov.flatten(), aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]
 
     #辞書型でファイル名と特徴量を紐づけ
     featuresWithPath[fileName] = allFeatures
