@@ -1,13 +1,10 @@
+import glob
+import re
 import sys
 
 import colour
 import cv2
-import matplotlib as mpl
-import matplotlib.cm as cm
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import seaborn as sns
 import win_unicode_console
 from colour.models import *
 from mpl_toolkits.mplot3d import Axes3D
@@ -20,7 +17,7 @@ win_unicode_console.enable()
 
 #表示のフォーマットを定義
 np.seterr(all='warn', over='raise')
-np.set_printoptions(precision=8, suppress=True, threshold=np.inf, linewidth=100)
+np.set_printoptions(precision=8, suppress=True, threshold=np.inf, linewidth=150)
 
 def getColorMoment(img, BIN_NUM=50):
     #www.kki.yamanashi.ac.jp/~ohbuchi/courses/2013/sm2013/pdf/sm13_lect01_20131007.pdf
@@ -108,7 +105,7 @@ def getBrightnessMeasure(rgb):
     Y = colour.RGB_to_YCbCr(rgb)[:, 0]
     lum = colour.RGB_to_HSL(rgb)[:, 2]
 
-    return np.c_[np.mean(Y), np.var(Y), np.min(Y), np.max(Y), np.mean(lum), np.var(lum), np.min(lum), np.max(lum)]
+    return np.r_[np.mean(Y), np.var(Y), np.min(Y), np.max(Y), np.mean(lum), np.var(lum), np.min(lum), np.max(lum)]
 
 def getContasrtMeasure(rgb):
     lum = colour.RGB_to_HSL(rgb)[:, 2]
@@ -121,7 +118,7 @@ def getContasrtMeasure(rgb):
 def getSaturationMeasure(rgb):
     sat = colour.RGB_to_HSL(rgb)[:, 1]
 
-    return np.c_[np.mean(sat), np.var(sat), np.min(sat), np.max(sat)]
+    return np.r_[np.mean(sat), np.var(sat), np.min(sat), np.max(sat)]
 
 #Measuring colourfulness in natural images [D.hasler, S.Susstrunk]
 def getColourFulness(rgb):
@@ -204,7 +201,6 @@ def SlidingWindow(imgX, imgY, stepSize, windowSize):
         for x in range(0, inputImg.shape[1], stepSize):
             yield imgX[y: y + windowSize, x: x + windowSize, :], imgY[y: y + windowSize, x: x + windowSize, :]
 
-
 def ColorFidelityMetric(rgbX, rgbY):
     M = 0
     Q = 0
@@ -245,167 +241,40 @@ def ColorFidelityMetric(rgbX, rgbY):
 
     return Q / M
 
+numbers = re.compile(r'(\d+)')
+def numericalSort(value):
+    parts = numbers.split(value)
+    parts[1::2] = map(int, parts[1::2])
+    return parts
 
 #------------------------------------------------------------------------
+#globだけではファイルの順列は保証されないためkey=numericalSortを用いる
+imagesPath = sorted(glob.glob('outimg/continuity_hue/All/*.jpg'), key=numericalSort)
 
-#連続画像から特徴を計算する
-COLOR_SPACE = "HSV"
+featuresWithPath={}
 
-argv = sys.argv
-
-imgName = argv[1]
-
-MAX_ITER = 100
-
-moments = np.zeros((MAX_ITER, 12), dtype='float64')
-entropys = np.zeros((MAX_ITER, 3), dtype='float64')
-aveGrads = np.zeros(MAX_ITER, dtype='float64')
-colorDist = np.zeros(MAX_ITER, dtype='float64')
-measures = np.zeros((MAX_ITER, 3), dtype='float64')
-SatMeasures = np.zeros((MAX_ITER, 4), dtype='float64')
-colorfulness = np.zeros(MAX_ITER, dtype='float64')
-naturalness = np.zeros(MAX_ITER, dtype='float64')
-contrast = np.zeros(MAX_ITER, dtype='float64')
-brightness = np.zeros((MAX_ITER, 8), dtype='float64')
-satDist = np.zeros(MAX_ITER, dtype='float64')
-CFM = np.zeros(MAX_ITER, dtype='float64')
-
-for it in range(MAX_ITER):
-    path = "outimg/continuity_hue/Natural/" + imgName + "_" + str(it) + ".jpg"
-    inputImg = cv2.imread(path, cv2.IMREAD_COLOR)
+for fileName in imagesPath:
+    inputImg = cv2.imread(fileName, cv2.IMREAD_COLOR)
 
     #正規化と整形
     inputImg = cv2.cvtColor(inputImg, cv2.COLOR_BGR2RGB) / 255.
     rgb = np.reshape(inputImg, (inputImg.shape[0] * inputImg.shape[1], 3))
-    
-    #初期画像の保存
-    if(it == 0):
-        initialRGB = rgb
 
-    #色空間の変換
-    if COLOR_SPACE is "RGB":
-        pixel = rgb
-    elif COLOR_SPACE is "HSV":
-        pixel = colour.RGB_to_HSV(rgb)
-    elif COLOR_SPACE is "HSL":
-        pixel = colour.RGB_to_HSL(rgb)
+    moment, cov = getColorMoment(rgb)
+    aveGrads = getAveGrad(rgb)
+    brightness = getBrightnessMeasure(rgb)
+    contrast = getContasrtMeasure(rgb)
+    SatMeasures = getSaturationMeasure(rgb)
+    colorfulness = getColourFulness(rgb)
+    naturalness = getNaturalness(rgb)
 
-    aveGrads[it] = getAveGrad(pixel)
-    entropys[it] = getEntropy(pixel)
-    moment, cov = getColorMoment(pixel)
-    moments[it] = moment
-    colorDist[it] = getDistance(initialRGB, rgb)
-    measures[it] = getImageMeasure(initialRGB, rgb)
+    allFeatures = np.r_[moment, cov.flatten(), aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]
 
-    SatMeasures[it] = getSaturationMeasure(rgb)
-    colorfulness[it] = getColourFulness(rgb)
-    naturalness[it] = getNaturalness(rgb)
-    contrast[it] = getContasrtMeasure(rgb)
-    brightness[it] = getBrightnessMeasure(rgb)
-    satDist[it] = getSatDistance(rgb, initialRGB)
-    CFM[it] = ColorFidelityMetric(initialRGB, rgb)
+    #辞書型でファイル名と特徴量を紐づけ
+    featuresWithPath[fileName] = allFeatures
 
-#------------------------------------------------------------------------
-#可視化
-sns.set_style("whitegrid", {'grid.linestyle': '--'})
-fig, axes = plt.subplots(nrows=2, ncols=4)
-ax = axes.ravel()
-
-fig.suptitle('Features of ' + imgName + ".jpg Color Space:" + COLOR_SPACE, fontsize=12, fontweight='bold')
-
-#平均勾配
-ax[0].plot(contrast, label="Contasrt var")
-ax[0].plot(aveGrads, label="Average Gradient")
-ax[0].set_ylim(0.0, 1.1)
-ax[0].set_xlabel("Iter")
-ax[0].legend()
-
-ax[1].set_title("Colorfulness & Naturalness")
-ax[1].plot(colorfulness, label="Colorfulness")
-ax[1].plot(naturalness, label="Naturalness")
-ax[1].set_ylim(0.0, 1.1)
-ax[1].set_xlabel("Iter")
-ax[1].legend()
-
-#エントロピー
-'''
-ax[1].set_title(COLOR_SPACE + " Entropy")
-df = pd.DataFrame({"Iter":range(MAX_ITER), "Hue": entropys[:, 0], "Saturation":entropys[:, 1], "Luminance": entropys[:, 2]})
-sns.lineplot(data=df, x="Iter", y="Hue", label="Hue", ax=ax[1])
-sns.lineplot(data=df, x="Iter", y="Saturation", label="Saturation", ax=ax[1])
-sns.lineplot(data=df, x="Iter", y="Luminance", label="Luminance", ax=ax[1])
-'''
-ax[2].set_title("Saturation Measure")
-ax[2].plot(SatMeasures[:, 0], label="Mean")
-ax[2].plot(SatMeasures[:, 1], label="Var")
-ax[2].plot(SatMeasures[:, 2], label="Min")
-ax[2].plot(SatMeasures[:, 3], label="Max")
-ax[2].legend()
-ax[2].set_xlabel("Iter")
-ax[2].set_ylim(0.0, 1.1)
-
-ax[3].set_title("Y Measure")
-ax[3].plot(brightness[:, 0], label="Measn")
-ax[3].plot(brightness[:, 1], label="Var")
-ax[3].plot(brightness[:, 2], label="Min")
-ax[3].plot(brightness[:, 3], label="Max")
-ax[3].set_xlabel("Iter")
-ax[3].set_ylim(0.0, 1.1)
-ax[3].legend()
-
-ax[4].set_title("L Measure")
-ax[4].plot(brightness[:, 4], label="Mean")
-ax[4].plot(brightness[:, 5], label="Var")
-ax[4].plot(brightness[:, 6], label="Min")
-ax[4].plot(brightness[:, 7], label="Max")
-ax[4].set_xlabel("Iter")
-ax[4].set_ylim(0.0, 1.1)
-ax[4].legend()
-
-'''
-#歪度
-ax[4].plot(moments[:, 2], label="Red")
-ax[4].plot(moments[:, 6], label="Green")
-ax[4].plot(moments[:, 10], label="Blue")
-ax[4].set_title(COLOR_SPACE + " Skweness")
-ax[4].set_xlabel("Iter")
-ax[4].legend()
-
-#尖度
-ax[5].plot(moments[:, 3], label="Red")
-ax[5].plot(moments[:, 7], label="Green")
-ax[5].plot(moments[:, 11], label="Blue")
-ax[5].set_title(COLOR_SPACE + " kurtosis")
-ax[5].set_xlabel("Iter")
-ax[5].legend()
-'''
-ax[5].plot(aveGrads + naturalness + colorfulness - (1-measures[:, 2]))
-
-ax[5].set_title("Energy")
-ax[5].set_xlabel("Iter")
-ax[5].legend()
-
-'''
-ax[6].plot(colorDist, label="RGB")
-ax[6].plot(satDist, label="Satuation")
-ax[6].set_title("Euclid Distance from init Img")
-ax[6].set_xlabel("Iter")
-ax[6].legend()
-'''
-print(CFM)
-ax[6].plot(CFM, label="RGB")
-ax[6].set_title("CFM")
-ax[6].set_xlabel("Iter")
-ax[6].legend()
-
-#PSNRは類似度が全く一緒だとlog0-->無限になるため、正規化する際は1つインデックスをずらず
-ax[7].plot(measures[:, 0], label="NRMSE")
-ax[7].plot(measures[:, 1] / np.max(measures[1:, 1]), label="PSNR(Normed)")
-ax[7].plot(measures[:, 2], label="SSIM")
-ax[7].set_title("Measures")
-ax[7].set_xlabel("Iter")
-ax[7].legend()
+#numpyの保存形式で保存
+#https://stackoverflow.com/questions/40219946/python-save-dictionaries-through-numpy-save
+np.save("ImageFeatures", featuresWithPath)
 
 
-#plt.tight_layout()
-plt.show()
