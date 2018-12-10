@@ -254,9 +254,9 @@ def numericalSort(value):
 
 #------------------------------------------------------------------------
 #globだけではファイルの順列は保証されないためkey=numericalSortを用いる
-imagesPath = sorted(glob.glob('outimg/continuity_hue/test/*.jpg'), key=numericalSort)
+imagesPath = sorted(glob.glob('outimg/continuity_hue/All/*.jpg'), key=numericalSort)
 
-di={}
+featuresWithPath={}
 
 for fileName in imagesPath:
     inputImg = cv2.imread(fileName, cv2.IMREAD_COLOR)
@@ -276,9 +276,10 @@ for fileName in imagesPath:
     allFeatures = np.r_[moment, cov, aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]
 
     #辞書型でファイル名と特徴量を紐づけ
-    di[fileName] = allFeatures
+    featuresWithPath[fileName] = allFeatures
 
+#numpyの保存形式で保存
+#https://stackoverflow.com/questions/40219946/python-save-dictionaries-through-numpy-save
+np.save("ImageFeatures", featuresWithPath)
 
-
-print(di)
 
