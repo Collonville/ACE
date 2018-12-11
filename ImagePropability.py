@@ -1,10 +1,6 @@
-
-import glob
 import sys
 
 import cv2
-import matplotlib as mpl
-import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 import sklearn
