@@ -99,7 +99,20 @@ sklearn.externals.joblib.dump(scaler, "LogisticRegresion/FeatureScaler.pkl", com
 
 #------------------------------------------------------------------------
 #学習の実行
-lr = LogisticRegression(solver='lbfgs', tol=1e-5, max_iter=500, C=10).fit(trainFeature, trainLabel)
+lr = LogisticRegression(solver='lbfgs', tol=1e-6, max_iter=1000, C=0.01, random_state=123).fit(trainFeature, trainLabel)
+
+#クロスバリデーションによる最適パラメータ決定
+'''
+#https://data-science.gr.jp/implementation/iml_sklearn_logistic_regression.html
+diparameter={"C":[10**i for i in range(-2,4)],"random_state":[123],}
+licv=sklearn.model_selection.GridSearchCV(LogisticRegression(),param_grid=diparameter,cv=5)
+licv.fit(trainFeature, trainLabel)
+predictor=licv.best_estimator_
+
+print(licv.best_score_)  # 最も良かったスコア
+print(licv.best_params_)  # 上記を記録したパラメータの組み合わせ
+print(predictor)
+'''
 
 #------------------------------------------------------------------------
 #学習の結果表示
