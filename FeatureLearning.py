@@ -10,6 +10,7 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numba
 import numpy as np
+import sklearn
 import win_unicode_console
 from mpl_toolkits.mplot3d import Axes3D
 from scipy import linalg, signal
@@ -53,7 +54,6 @@ def getTrainingdata():
     
     #それぞれの教師データを取得
     for fileName in trainingFiles:
-        print(fileName)
         matrix = np.loadtxt(fileName, delimiter=",")
 
         #特徴量の追加
@@ -68,15 +68,48 @@ def getTrainingdata():
 
 feature, label = getTrainingdata()
 
+#nanがある場合は0で埋める(要修正)
 feature[np.isnan(feature)] = 0
 
 #------------------------------------------------------------------------
-lr = LogisticRegression(tol=1e-5, max_iter=300).fit(feature[0:20000, :], label[0:20000])
+#訓練とテストデータを割合で分割
+trainNum = 15000
+testNum = label.shape[0] - trainNum
 
-np.save("intercept", lr.intercept_)
-np.save("coef", lr.coef_)
+print("Dataset num:%d, Train num:%d, Test num:%d" % (label.shape[0], trainNum, testNum))
 
-print (lr.score(feature, label))
-print(lr.intercept_)
-print(lr.coef_)
-print (lr.score(feature[20000:24000, :], label[20000:24000]))
+#ランダムでインデックスを作成
+randomIdx = np.random.choice(label.shape[0], label.shape[0], replace=False)
+trainIdx = randomIdx[0:trainNum]
+testIdx = randomIdx[trainNum:label.shape[0]]
+
+trainFeature = feature[trainIdx]
+trainLabel   = label[trainIdx]
+testFeature  = feature[testIdx]
+testLabel    = label[testIdx]
+
+#------------------------------------------------------------------------
+#特徴量の正規化
+scaler = sklearn.preprocessing.StandardScaler()
+scaler.fit(trainFeature)
+trainFeature = scaler.transform(trainFeature)
+
+#保存
+sklearn.externals.joblib.dump(scaler, "LogisticRegresion/FeatureScaler.pkl", compress=True)
+
+#------------------------------------------------------------------------
+#学習の実行
+lr = LogisticRegression(solver='lbfgs', tol=1e-5, max_iter=500, C=10).fit(trainFeature, trainLabel)
+
+#------------------------------------------------------------------------
+#学習の結果表示
+np.save("LogisticRegresion/intercept", lr.intercept_)
+np.save("LogisticRegresion/coef", lr.coef_[0])
+
+#テストデータの正規化
+testFeature = scaler.transform(testFeature)
+
+print("Training Score: %f" % (lr.score(trainFeature, trainLabel)))
+print("Test Score: %f" % (lr.score(testFeature, testLabel)))
+print("Intercept: %f" % (lr.intercept_))
+print("Coef: %s" % (np.array2string(lr.coef_[0])))

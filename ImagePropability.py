@@ -1,7 +1,5 @@
 
 import glob
-import itertools
-import math
 import sys
 
 import cv2
@@ -9,11 +7,8 @@ import matplotlib as mpl
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
+import sklearn
 import win_unicode_console
-from colour.models import *
-from colour.plotting import *
-from mpl_toolkits.mplot3d import Axes3D
-from PIL import Image, ImageColor
 
 import ImageFeature
 
@@ -23,14 +18,19 @@ win_unicode_console.enable()
 np.set_printoptions(precision=10, suppress=True, threshold=np.inf, linewidth=100)
 
 #------------------------------------------------------------------------
-fileName = "water-lily-3784022__340"
+fileName = "wool"
 inputImgPath = "outimg/continuity_hue/All/" + fileName
 
-intercept = np.load("LogisticRegresionResult/intercept.npy")
-coef = np.load("LogisticRegresionResult/coef.npy") #多重配列になっていたから先頭だけ抽出
+#学習済みパラメータの取得
+intercept = np.load("LogisticRegresion/intercept.npy")
+coef = np.load("LogisticRegresion/coef.npy")
+
+#標準器の読み込み
+scaler = sklearn.externals.joblib.load("LogisticRegresion/FeatureScaler.pkl")
 
 imageFeature = ImageFeature.ImageFeature()
-propability = np.empty(0)
+
+features = np.empty((0, 37))
 
 for it in range(100):
     inputImg = cv2.imread(inputImgPath + "_" + str(it) + ".jpg", cv2.IMREAD_COLOR)
@@ -39,11 +39,18 @@ for it in range(100):
     inputImg = cv2.cvtColor(inputImg, cv2.COLOR_BGR2RGB) / 255.
     rgb = np.reshape(inputImg, (inputImg.shape[0] * inputImg.shape[1], 3))
 
+    #特徴量の計算
     feature = imageFeature.getImageFeatureFromRGB(rgb)
-
     feature[np.isnan(feature)] = 0
 
-    propability = np.r_[propability, 1. / (1. + np.exp(intercept + np.dot(coef, feature)))]
+    features = np.r_[features, feature]
+
+#特徴量の標準化
+features = scaler.transform(features)
+
+#選択確率の計算
+portion = intercept + np.dot(coef, features.T)
+propability = 1. / (1. + np.exp(-portion))
 
 print("Max iter=%d, propability=%f" % (np.argmax(propability), np.max(propability)))
 plt.plot(propability)

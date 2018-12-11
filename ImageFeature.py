@@ -53,11 +53,11 @@ class ImageFeature:
         gKurt = kurtosis(gChannel)
         bKurt = kurtosis(bChannel)
 
-        rMoment = [rMean, rVar, rSkew, rKurt]
-        gMoment = [gMean, gVar, gSkew, gKurt]
-        bMoment = [bMean, bVar, bSkew, bKurt]
+        rMoment = np.c_[rMean, rVar, rSkew, rKurt]
+        gMoment = np.c_[gMean, gVar, gSkew, gKurt]
+        bMoment = np.c_[bMean, bVar, bSkew, bKurt]
 
-        return np.r_[rMoment, gMoment, bMoment], rgbCov
+        return np.c_[rMoment, gMoment, bMoment], rgbCov
 
     def getAveGrad(self, pixels):
         #勾配値情報
@@ -79,7 +79,7 @@ class ImageFeature:
         entropy2 = entropy(np.histogram(pixels[:, 1], bins=BIN_NUM)[0], base=2)
         entropy3 = entropy(np.histogram(pixels[:, 2], bins=BIN_NUM)[0], base=2)
         '''
-        return np.r_[entropy1, entropy2, entropy3]
+        return np.c_[entropy1, entropy2, entropy3]
 
     def getDistance(self, pixels1, pixels2):
         lab1 = colour.XYZ_to_Lab(colour.sRGB_to_XYZ(pixels1))
@@ -102,13 +102,13 @@ class ImageFeature:
         PSNR = compare_psnr(pixels1, pixels2)
         SSIM = compare_ssim(pixels1, pixels2, multichannel=True)
         
-        return [NRMSE, PSNR, SSIM]
+        return np.c_[NRMSE, PSNR, SSIM]
 
     def getBrightnessMeasure(self, rgb):
         Y = colour.RGB_to_YCbCr(rgb)[:, 0]
         lum = colour.RGB_to_HSL(rgb)[:, 2]
 
-        return np.r_[np.mean(Y), np.var(Y), np.min(Y), np.max(Y), np.mean(lum), np.var(lum), np.min(lum), np.max(lum)]
+        return np.c_[np.mean(Y), np.var(Y), np.min(Y), np.max(Y), np.mean(lum), np.var(lum), np.min(lum), np.max(lum)]
 
     def getContasrtMeasure(self, rgb):
         lum = colour.RGB_to_HSL(rgb)[:, 2]
@@ -121,7 +121,7 @@ class ImageFeature:
     def getSaturationMeasure(self, rgb):
         sat = colour.RGB_to_HSL(rgb)[:, 1]
 
-        return np.r_[np.mean(sat), np.var(sat), np.min(sat), np.max(sat)]
+        return np.c_[np.mean(sat), np.var(sat), np.min(sat), np.max(sat)]
 
     #Measuring colourfulness in natural images [D.hasler, S.Susstrunk]
     def getColourFulness(self, rgb):
@@ -289,4 +289,4 @@ class ImageFeature:
         colorfulness = self.getColourFulness(rgb)
         naturalness  = self.getNaturalness(rgb)
         
-        return np.r_[moment, cov.flatten(), aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]
+        return np.c_[moment, cov.flatten().reshape(1, -1), aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]
