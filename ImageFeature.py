@@ -203,7 +203,12 @@ class ImageFeature:
         for y in range(0, inputImg.shape[0], stepSize):
             for x in range(0, inputImg.shape[1], stepSize):
                 yield imgX[y: y + windowSize, x: x + windowSize, :], imgY[y: y + windowSize, x: x + windowSize, :]
-
+    def rgb2lab(self, rgb):
+        RGB2LMS_Mat = np.matrix([
+            [0.3811, 0.5783, 0.0402],
+            [0.1967, 0.7244, 0.0782],
+            [0.0241, 0.1288, 0.8444]
+        ])
     def ColorFidelityMetric(self, rgbX, rgbY):
         M = 0
         Q = 0
