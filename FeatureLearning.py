@@ -36,13 +36,10 @@ def exportImageFeature():
 
             #特徴量の取得
             imageFeature = imageFeatures.item().get('outimg/continuity_hue/All\\' + pathKey)
-            #imageFeature = np.reshape(imageFeature, (1, 37))
-            #print(imageFeature.shape)
+
             features.append(imageFeature)
 
     np.save("ImageFeaturesSorted", features)
-    
-    return np.zeros([50, 120], dtype=float)
 
 def getTrainingdata():
     trainingFiles = glob.glob("TrainingData/*.csv")
@@ -73,19 +70,13 @@ feature, label = getTrainingdata()
 
 feature[np.isnan(feature)] = 0
 
-np.save("AllFeatures", feature)
-np.save("Labels", label)
-
 #------------------------------------------------------------------------
 lr = LogisticRegression(tol=1e-5, max_iter=300).fit(feature[0:20000, :], label[0:20000])
+
+np.save("intercept", lr.intercept_)
+np.save("coef", lr.coef_)
 
 print (lr.score(feature, label))
 print(lr.intercept_)
 print(lr.coef_)
 print (lr.score(feature[20000:24000, :], label[20000:24000]))
-
-
-
-
-
-#------------------------------------------------------------------------
