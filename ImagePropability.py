@@ -18,7 +18,7 @@ win_unicode_console.enable()
 np.set_printoptions(precision=10, suppress=True, threshold=np.inf, linewidth=100)
 
 #------------------------------------------------------------------------
-fileName = "wool"
+fileName = sys.argv[1]
 inputImgPath = "outimg/continuity_hue/All/" + fileName
 
 #学習済みパラメータの取得
