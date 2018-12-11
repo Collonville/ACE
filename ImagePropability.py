@@ -26,7 +26,7 @@ scaler = sklearn.externals.joblib.load("LogisticRegresion/FeatureScaler.pkl")
 
 imageFeature = ImageFeature.ImageFeature()
 
-features = np.empty((0, 37))
+features = np.empty((0, coef.shape[0]))
 
 for it in range(100):
     inputImg = cv2.imread(inputImgPath + "_" + str(it) + ".jpg", cv2.IMREAD_COLOR)
@@ -51,6 +51,7 @@ propability = 1. / (1. + np.exp(-portion))
 print("Max iter=%d, propability=%f" % (np.argmax(propability), np.max(propability)))
 plt.plot(propability)
 plt.plot(np.argmax(propability), np.max(propability), marker='o', color='r')
+plt.text(np.argmax(propability) + 5, np.max(propability), "Iter=%d, Propability=%f" % (np.argmax(propability), np.max(propability)))
 plt.xlabel("Iter")
 plt.ylabel("Propability")
 plt.grid(True)
