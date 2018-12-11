@@ -267,7 +267,7 @@ for fileName in imagesPath:
     SatMeasures = getSaturationMeasure(rgb)
     colorfulness = getColourFulness(rgb)
     naturalness = getNaturalness(rgb)
-
+    #naturalnessの1301-1309でNanが発生
     allFeatures = np.r_[moment, cov.flatten(), aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]
 
     #辞書型でファイル名と特徴量を紐づけ

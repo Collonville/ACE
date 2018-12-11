@@ -1,32 +1,20 @@
+import codecs
 import copy
+import glob
 import itertools
-import math
+import os
 import sys
 
-import colour
 import matplotlib as mpl
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numba
 import numpy as np
 import win_unicode_console
-from colour.models import *
-from colour.plotting import *
 from mpl_toolkits.mplot3d import Axes3D
-from PIL import Image, ImageColor
 from scipy import linalg, signal
-from scipy.fftpack import *
 from scipy.optimize import *
-from skimage import filters
-from sklearn.metrics import mean_squared_error
-from sympy import *
-from sympy.matrices import *
-from scipy.stats import entropy
-import cv2
-from scipy.stats import kurtosis, skew
-import glob
-import codecs
-import os
+from sklearn.linear_model import LogisticRegression
 
 win_unicode_console.enable()
 
@@ -83,14 +71,21 @@ def getTrainingdata():
 
 feature, label = getTrainingdata()
 
+feature[np.isnan(feature)] = 0
+
 np.save("AllFeatures", feature)
 np.save("Labels", label)
 
-print(feature.shape)
-print(label.shape)
+#------------------------------------------------------------------------
+lr = LogisticRegression(tol=1e-5, max_iter=300).fit(feature[0:20000, :], label[0:20000])
+
+print (lr.score(feature, label))
+print(lr.intercept_)
+print(lr.coef_)
+print (lr.score(feature[20000:24000, :], label[20000:24000]))
+
+
+
+
 
 #------------------------------------------------------------------------
-
-
-#------------------------------------------------------------------------
-
