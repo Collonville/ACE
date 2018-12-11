@@ -83,6 +83,7 @@ randomIdx = np.random.choice(label.shape[0], label.shape[0], replace=False)
 trainIdx = randomIdx[0:trainNum]
 testIdx = randomIdx[trainNum:label.shape[0]]
 
+#訓練とテストデータに分ける
 trainFeature = feature[trainIdx]
 trainLabel   = label[trainIdx]
 testFeature  = feature[testIdx]
