@@ -38,11 +38,13 @@ imageFeature = ImageFeature.ImageFeature()
 
 features = np.empty((0, coef.shape[0]))
 
+initRGB = getImageRGBFromPath("img/All/" + fileName + ".jpg")
+
 for it in range(100):
     rgb = getImageRGBFromPath(inputImgPath + "_" + str(it) + ".jpg")
 
     #特徴量の取得
-    feature = imageFeature.getImageFeatureFromRGB(rgb)
+    feature = imageFeature.getImageFeatureFromRGB(rgb, initRGB)
     feature[np.isnan(feature)] = 0
 
     features = np.r_[features, feature]

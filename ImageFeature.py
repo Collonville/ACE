@@ -200,8 +200,8 @@ class ImageFeature:
 
     #https://www.pyimagesearch.com/2015/03/23/sliding-windows-for-object-detection-with-python-and-opencv/
     def SlidingWindow(self, imgX, imgY, stepSize, windowSize):
-        for y in range(0, inputImg.shape[0], stepSize):
-            for x in range(0, inputImg.shape[1], stepSize):
+        for y in range(0, self.imgH, stepSize):
+            for x in range(0, self.imgW, stepSize):
                 yield imgX[y: y + windowSize, x: x + windowSize, :], imgY[y: y + windowSize, x: x + windowSize, :]
 
     def rgb2lab(self, rgb):
@@ -234,17 +234,16 @@ class ImageFeature:
         Q = 0
 
         #RGB-->lab(Not CIE Lab)
-        lab_X = [self.rgb2lab(rgb) for rgb in rgbX]
-        lab_Y = [self.rgb2lab(rgb) for rgb in rgbY]
-
-        print(lab_X)
+        #内包forを使わない方法-->https://qiita.com/ysk24ok/items/5e16ed7d26695f0b9330
+        lab_X = np.apply_along_axis(self.rgb2lab, 1, rgbX)
+        lab_Y = np.apply_along_axis(self.rgb2lab, 1, rgbY)
 
         #W * H * 3に変形
         lab_X = np.reshape(lab_X, (self.imgH, self.imgW, 3))
         lab_Y = np.reshape(lab_Y, (self.imgH, self.imgW, 3))
 
         #ウィンドウサイズごとのFidelityMetricを計算
-        for (cropX, cropY) in SlidingWindow(lab_X, lab_Y, 1, 8):
+        for (cropX, cropY) in self.SlidingWindow(lab_X, lab_Y, 1, 8):
             # if the window does not meet our desired window size, ignore it
             if cropX.shape[0] != 8 or cropX.shape[1] != 8:
                 continue 
@@ -259,9 +258,9 @@ class ImageFeature:
             cropa_Y = cropY[:, :, 1].flatten()
             cropb_Y = cropY[:, :, 2].flatten()
 
-            Ql = FidelityMetric(cropL_X, cropL_Y)
-            Qa = FidelityMetric(cropa_X, cropa_Y)
-            Qb = FidelityMetric(cropb_X, cropb_Y)
+            Ql = self.FidelityMetric(cropL_X, cropL_Y)
+            Qa = self.FidelityMetric(cropa_X, cropa_Y)
+            Qb = self.FidelityMetric(cropb_X, cropb_Y)
 
             Q += np.sqrt(Ql**2 + Qa**2 + Qb**2)
 
@@ -306,7 +305,7 @@ class ImageFeature:
         #https://stackoverflow.com/questions/40219946/python-save-dictionaries-through-numpy-save
         np.save("ImageFeatures", featuresWithPath)
     
-    def getImageFeatureFromRGB(self, rgb, initrgb=[0,0,0]):
+    def getImageFeatureFromRGB(self, rgb, initrgb):
         moment, cov  = self.getColorMoment(rgb)
         aveGrads     = self.getAveGrad(rgb)
         brightness   = self.getBrightnessMeasure(rgb)
