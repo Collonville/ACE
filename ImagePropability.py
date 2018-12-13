@@ -13,6 +13,15 @@ win_unicode_console.enable()
 #表示のフォーマットを定義
 np.set_printoptions(precision=10, suppress=True, threshold=np.inf, linewidth=100)
 
+def getImageFromPath(filePath):
+    inputImg = cv2.imread(filePath, cv2.IMREAD_COLOR)
+
+    #正規化と整形
+    inputImg = cv2.cvtColor(inputImg, cv2.COLOR_BGR2RGB) / 255.
+    rgb = np.reshape(inputImg, (inputImg.shape[0] * inputImg.shape[1], 3))
+
+    return rgb
+
 #------------------------------------------------------------------------
 fileName = sys.argv[1]
 inputImgPath = "outimg/continuity_hue/All/" + fileName
@@ -24,18 +33,15 @@ coef = np.load("LogisticRegresion/coef.npy")
 #標準器の読み込み
 scaler = sklearn.externals.joblib.load("LogisticRegresion/FeatureScaler.pkl")
 
+#画像特徴量取得に関するインスタンス
 imageFeature = ImageFeature.ImageFeature()
 
 features = np.empty((0, coef.shape[0]))
 
 for it in range(100):
-    inputImg = cv2.imread(inputImgPath + "_" + str(it) + ".jpg", cv2.IMREAD_COLOR)
+    rgb = getImageFromPath(inputImgPath + "_" + str(it) + ".jpg")
 
-    #正規化と整形
-    inputImg = cv2.cvtColor(inputImg, cv2.COLOR_BGR2RGB) / 255.
-    rgb = np.reshape(inputImg, (inputImg.shape[0] * inputImg.shape[1], 3))
-
-    #特徴量の計算
+    #特徴量の取得
     feature = imageFeature.getImageFeatureFromRGB(rgb)
     feature[np.isnan(feature)] = 0
 

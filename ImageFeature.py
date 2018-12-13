@@ -203,28 +203,42 @@ class ImageFeature:
         for y in range(0, inputImg.shape[0], stepSize):
             for x in range(0, inputImg.shape[1], stepSize):
                 yield imgX[y: y + windowSize, x: x + windowSize, :], imgY[y: y + windowSize, x: x + windowSize, :]
+
     def rgb2lab(self, rgb):
         RGB2LMS_Mat = np.matrix([
             [0.3811, 0.5783, 0.0402],
             [0.1967, 0.7244, 0.0782],
             [0.0241, 0.1288, 0.8444]
         ])
+
+        left = np.matrix([
+            [1 / np.sqrt(3), 0, 0],
+            [0, 1 / np.sqrt(6), 0],
+            [0, 0, 1 / np.sqrt(2)]
+        ])
+
+        middle = np.matrix([
+            [1,  1,  1],
+            [1,  1, -2],
+            [1, -1,  0]
+        ])
+
+        return left * middle * RGB2LMS_Mat * rgb.T
+
     def ColorFidelityMetric(self, rgbX, rgbY):
         M = 0
         Q = 0
 
-        #W * H * 3に変形
-        rgbX_ = np.reshape(rgbX, (inputImg.shape[0], inputImg.shape[1], 3))
-        rgbY_ = np.reshape(rgbY, (inputImg.shape[0], inputImg.shape[1], 3))
+        #RGB-->lab(Not CIE Lab)
+        lab_X = [rgb2lab(rgb) for rgb in rgbX]
+        lab_Y = [rgb2lab(rgb) for rgb in rgbY]
 
-        #RGB-->Lab
-        XYZ_X = colour.sRGB_to_XYZ(rgbX_)
-        XYZ_Y = colour.sRGB_to_XYZ(rgbY_)
-        Lab_X = colour.XYZ_to_Lab(XYZ_X)
-        Lab_Y = colour.XYZ_to_Lab(XYZ_Y)
+        #W * H * 3に変形
+        lab_X = np.reshape(lab_X, (self.imgH, self.imgW, 3))
+        lab_Y = np.reshape(lab_Y, (self.imgH, self.imgW, 3))
 
         #ウィンドウサイズごとのFidelityMetricを計算
-        for (cropX, cropY) in SlidingWindow(Lab_X, Lab_Y, 1, 8):
+        for (cropX, cropY) in SlidingWindow(lab_X, lab_Y, 1, 8):
             # if the window does not meet our desired window size, ignore it
             if cropX.shape[0] != 8 or cropX.shape[1] != 8:
                 continue 
@@ -275,6 +289,7 @@ class ImageFeature:
             SatMeasures  = self.getSaturationMeasure(rgb)
             colorfulness = self.getColourFulness(rgb)
             naturalness  = self.getNaturalness(rgb)
+            
             #naturalnessの1301-1309でNanが発生
             allFeatures = np.r_[moment, cov.flatten(), aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]
 
@@ -285,7 +300,7 @@ class ImageFeature:
         #https://stackoverflow.com/questions/40219946/python-save-dictionaries-through-numpy-save
         np.save("ImageFeatures", featuresWithPath)
     
-    def getImageFeatureFromRGB(self, rgb):
+    def getImageFeatureFromRGB(self, rgb, initrgb=[0,0,0]):
         moment, cov  = self.getColorMoment(rgb)
         aveGrads     = self.getAveGrad(rgb)
         brightness   = self.getBrightnessMeasure(rgb)
@@ -293,5 +308,6 @@ class ImageFeature:
         SatMeasures  = self.getSaturationMeasure(rgb)
         colorfulness = self.getColourFulness(rgb)
         naturalness  = self.getNaturalness(rgb)
+        #fidelityMetric = self.ColorFidelityMetric(rgb, initrgb)
         
         return np.c_[moment, cov.flatten().reshape(1, -1), aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]
