@@ -13,7 +13,7 @@ win_unicode_console.enable()
 #表示のフォーマットを定義
 np.set_printoptions(precision=10, suppress=True, threshold=np.inf, linewidth=100)
 
-def getImageFromPath(filePath):
+def getImageRGBFromPath(filePath):
     inputImg = cv2.imread(filePath, cv2.IMREAD_COLOR)
 
     #正規化と整形
@@ -39,7 +39,7 @@ imageFeature = ImageFeature.ImageFeature()
 features = np.empty((0, coef.shape[0]))
 
 for it in range(100):
-    rgb = getImageFromPath(inputImgPath + "_" + str(it) + ".jpg")
+    rgb = getImageRGBFromPath(inputImgPath + "_" + str(it) + ".jpg")
 
     #特徴量の取得
     feature = imageFeature.getImageFeatureFromRGB(rgb)
