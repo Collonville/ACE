@@ -223,15 +223,21 @@ class ImageFeature:
             [1, -1,  0]
         ])
 
-        return left * middle * RGB2LMS_Mat * rgb.T
+        #labの計算
+        lab = left * middle * RGB2LMS_Mat * rgb.reshape(3, 1)
+
+        #matrix-->ndarrayへ変換
+        return np.array(lab).ravel()
 
     def ColorFidelityMetric(self, rgbX, rgbY):
         M = 0
         Q = 0
 
         #RGB-->lab(Not CIE Lab)
-        lab_X = [rgb2lab(rgb) for rgb in rgbX]
-        lab_Y = [rgb2lab(rgb) for rgb in rgbY]
+        lab_X = [self.rgb2lab(rgb) for rgb in rgbX]
+        lab_Y = [self.rgb2lab(rgb) for rgb in rgbY]
+
+        print(lab_X)
 
         #W * H * 3に変形
         lab_X = np.reshape(lab_X, (self.imgH, self.imgW, 3))
@@ -308,6 +314,6 @@ class ImageFeature:
         SatMeasures  = self.getSaturationMeasure(rgb)
         colorfulness = self.getColourFulness(rgb)
         naturalness  = self.getNaturalness(rgb)
-        #fidelityMetric = self.ColorFidelityMetric(rgb, initrgb)
+        fidelityMetric = self.ColorFidelityMetric(rgb, initrgb)
         
         return np.c_[moment, cov.flatten().reshape(1, -1), aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]
