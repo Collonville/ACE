@@ -274,7 +274,10 @@ class ImageFeature:
         parts[1::2] = map(int, parts[1::2])
         return parts
     
-    def getAllFeatures(self):
+    def getAllFeatures(self, imgH, imgW, initrgb):
+        self.imgH = imgH
+        self.imgW = imgW
+        
         #globだけではファイルの順列は保証されないためkey=numericalSortを用いる
         imagesPath = sorted(glob.glob('outimg/continuity_hue/All/*.jpg'), key=numericalSort)
 
