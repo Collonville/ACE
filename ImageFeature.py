@@ -305,7 +305,10 @@ class ImageFeature:
         #https://stackoverflow.com/questions/40219946/python-save-dictionaries-through-numpy-save
         np.save("ImageFeatures", featuresWithPath)
     
-    def getImageFeatureFromRGB(self, rgb, initrgb):
+    def getImageFeatureFromRGB(self, rgb, imgH, imgW, initrgb):
+        self.imgH = imgH
+        self.imgW = imgW
+
         moment, cov  = self.getColorMoment(rgb)
         aveGrads     = self.getAveGrad(rgb)
         brightness   = self.getBrightnessMeasure(rgb)
@@ -313,6 +316,6 @@ class ImageFeature:
         SatMeasures  = self.getSaturationMeasure(rgb)
         colorfulness = self.getColourFulness(rgb)
         naturalness  = self.getNaturalness(rgb)
-        fidelityMetric = self.ColorFidelityMetric(rgb, initrgb)
+        #fidelityMetric = self.ColorFidelityMetric(rgb, initrgb)
         
         return np.c_[moment, cov.flatten().reshape(1, -1), aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]
