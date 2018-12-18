@@ -34,6 +34,11 @@ class ImageFeature:
         gMean = np.mean(gChannel)
         bMean = np.mean(bChannel)
 
+        #中央値
+        rMedian = np.median(rChannel)
+        gMedian = np.median(gChannel)
+        bMedian = np.median(bChannel)
+
         #分散
         rVar = np.var(rChannel)
         gVar = np.var(gChannel)
@@ -53,9 +58,9 @@ class ImageFeature:
         gKurt = kurtosis(gChannel)
         bKurt = kurtosis(bChannel)
 
-        rMoment = np.c_[rMean, rVar, rSkew, rKurt]
-        gMoment = np.c_[gMean, gVar, gSkew, gKurt]
-        bMoment = np.c_[bMean, bVar, bSkew, bKurt]
+        rMoment = np.c_[rMean, rMedian, rVar, rSkew, rKurt]
+        gMoment = np.c_[gMean, gMedian, gVar, gSkew, gKurt]
+        bMoment = np.c_[bMean, bMedian, bVar, bSkew, bKurt]
 
         return np.c_[rMoment, gMoment, bMoment], rgbCov
 
