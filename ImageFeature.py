@@ -279,12 +279,9 @@ class ImageFeature:
         parts[1::2] = map(int, parts[1::2])
         return parts
     
-    def getAllFeatures(self, imgH, imgW, initrgb):
-        self.imgH = imgH
-        self.imgW = imgW
-        
+    def getFeaturesFromPath(self, pathName, initrgb):
         #globだけではファイルの順列は保証されないためkey=numericalSortを用いる
-        imagesPath = sorted(glob.glob('outimg/continuity_hue/All/*.jpg'), key=numericalSort)
+        imagesPath = sorted(glob.glob(pathName), key=numericalSort)
 
         featuresWithPath={}
 
@@ -293,7 +290,11 @@ class ImageFeature:
 
             #正規化と整形
             inputImg = cv2.cvtColor(inputImg, cv2.COLOR_BGR2RGB) / 255.
-            rgb = np.reshape(inputImg, (inputImg.shape[0] * inputImg.shape[1], 3))
+
+            self.imgH = inputImg.shape[0]
+            self.imgW = inputImg.shape[1]
+
+            rgb = np.reshape(inputImg, (self.imgH * self.imgW, 3))
 
             moment, cov  = self.getColorMoment(rgb)
             aveGrads     = self.getAveGrad(rgb)
