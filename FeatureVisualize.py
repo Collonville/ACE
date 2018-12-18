@@ -190,7 +190,7 @@ def FidelityMetric(x, y):
     xVar = np.var(x, ddof=1)
     yVar = np.var(y, ddof=1)
 
-    xyCov = np.cov(x, y, ddof=1)[0, 0]
+    xyCov = np.cov([x, y], ddof=1, rowvar=False)[0, 0]
 
     Q1 = xyCov / (np.sqrt(xVar) * np.sqrt(yVar))
     Q2 = (2 * xMean * yMean) / (xMean**2 + yMean**2)
@@ -198,7 +198,7 @@ def FidelityMetric(x, y):
 
     return (Q1 * Q2 * Q3)
 
-
+#https://www.pyimagesearch.com/2015/03/23/sliding-windows-for-object-detection-with-python-and-opencv/
 def SlidingWindow(imgX, imgY, stepSize, windowSize):
     for y in range(0, inputImg.shape[0], stepSize):
         for x in range(0, inputImg.shape[1], stepSize):
@@ -240,7 +240,7 @@ def ColorFidelityMetric(rgbX, rgbY):
 
         Q += np.sqrt(Ql**2 + Qa**2 + Qb**2)
 
-        M = M + 1
+        M += 1
 
     return Q / M
 
