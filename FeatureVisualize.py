@@ -204,7 +204,6 @@ def SlidingWindow(imgX, imgY, stepSize, windowSize):
         for x in range(0, inputImg.shape[1], stepSize):
             yield imgX[y: y + windowSize, x: x + windowSize, :], imgY[y: y + windowSize, x: x + windowSize, :]
 
-
 def ColorFidelityMetric(rgbX, rgbY):
     M = 0
     Q = 0
