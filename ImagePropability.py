@@ -20,7 +20,7 @@ def getImageRGBFromPath(filePath):
     inputImg = cv2.cvtColor(inputImg, cv2.COLOR_BGR2RGB) / 255.
     rgb = np.reshape(inputImg, (inputImg.shape[0] * inputImg.shape[1], 3))
 
-    return rgb
+    return rgb, inputImg.shape[0], inputImg.shape[1]
 
 #------------------------------------------------------------------------
 fileName = sys.argv[1]
@@ -41,10 +41,10 @@ features = np.empty((0, coef.shape[0]))
 initRGB = getImageRGBFromPath("img/All/" + fileName + ".jpg")
 
 for it in range(100):
-    rgb = getImageRGBFromPath(inputImgPath + "_" + str(it) + ".jpg")
+    rgb, imgH, imgW = getImageRGBFromPath(inputImgPath + "_" + str(it) + ".jpg")
 
     #特徴量の取得
-    feature = imageFeature.getImageFeatureFromRGB(rgb, initRGB)
+    feature = imageFeature.getImageFeatureFromRGB(rgb, imgH, imgW, initRGB)
     feature[np.isnan(feature)] = 0
 
     features = np.r_[features, feature]

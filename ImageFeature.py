@@ -12,6 +12,7 @@ from scipy.stats import entropy, kurtosis, skew
 from skimage import data, filters
 from skimage.measure import *
 from sklearn.metrics import mean_squared_error
+import datetime
 
 win_unicode_console.enable()
 
@@ -21,6 +22,7 @@ np.set_printoptions(precision=8, suppress=True, threshold=np.inf, linewidth=150)
 class ImageFeature:
     imgW = 50
     imgH = 50
+    numbers = re.compile(r'(\d+)')
 
     def getColorMoment(self, img, BIN_NUM=50):
         #www.kki.yamanashi.ac.jp/~ohbuchi/courses/2013/sm2013/pdf/sm13_lect01_20131007.pdf
@@ -273,19 +275,20 @@ class ImageFeature:
 
         return Q / M
 
-    numbers = re.compile(r'(\d+)')
-    def numericalSort(value):
-        parts = numbers.split(value)
+    
+    def numericalSort(self, value):
+        parts = self.numbers.split(value)
         parts[1::2] = map(int, parts[1::2])
         return parts
     
     def getFeaturesFromPath(self, pathName, initrgb):
         #globだけではファイルの順列は保証されないためkey=numericalSortを用いる
-        imagesPath = sorted(glob.glob(pathName), key=numericalSort)
+        imagesPath = sorted(glob.glob(pathName), key=self.numericalSort)
 
         featuresWithPath={}
 
         for fileName in imagesPath:
+            print(fileName)
             inputImg = cv2.imread(fileName, cv2.IMREAD_COLOR)
 
             #正規化と整形
@@ -305,14 +308,15 @@ class ImageFeature:
             naturalness  = self.getNaturalness(rgb)
             
             #naturalnessの1301-1309でNanが発生
-            allFeatures = np.r_[moment, cov.flatten(), aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]
+            allFeatures = np.c_[moment, cov.flatten().reshape(1, -1), aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]
 
             #辞書型でファイル名と特徴量を紐づけ
             featuresWithPath[fileName] = allFeatures
 
         #numpyの保存形式で保存
         #https://stackoverflow.com/questions/40219946/python-save-dictionaries-through-numpy-save
-        np.save("ImageFeatures", featuresWithPath)
+        now = datetime.datetime.now()
+        np.save("ImageFeature/" + 'ImageFeaturesWithPath_' + str(len(imagesPath)) + 'image_' + str(allFeatures.shape[1]) + 'dim_{0:%Y%m%d_%H%M%S}'.format(now), featuresWithPath)
     
     def getImageFeatureFromRGB(self, rgb, imgH, imgW, initrgb):
         self.imgH = imgH

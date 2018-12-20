@@ -16,18 +16,22 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy import linalg, signal
 from scipy.optimize import *
 from sklearn.linear_model import LogisticRegression
+import ImageFeature
 
 win_unicode_console.enable()
 
 #表示のフォーマットを定義
 np.set_printoptions(precision=10, suppress=True, threshold=np.inf, linewidth=100)
 
-def exportImageFeature():
-    imageFeatures = np.load("ImageFeatures.npy")
+"""
+ファイル名と特徴量の辞書(ImageFeaturesWithPath)からファイル名でソートされた順の特徴量を得る
+"""
+def getSortedImageFeatures():
+    imageFeatures = np.load("ImageFeature/ImageFeaturesWithPath_5000image_40dim_20181219_130703.npy")
 
     features = []
     
-    for fileName in [os.path.basename(r) for r in glob.glob('img/**/*.jpg')]:
+    for fileName in [os.path.basename(r) for r in glob.glob('img/All/*.jpg')]:
         #拡張子とファイル名を分割
         filename = fileName.split('.')
 
@@ -35,19 +39,23 @@ def exportImageFeature():
             #インデックス値を挿入
             pathKey = filename[:][0] + "_" + str(index) + "." + filename[:][1]
 
-            #特徴量の取得
-            imageFeature = imageFeatures.item().get('outimg/continuity_hue/All\\' + pathKey)
+            #ファイル名から特徴量の取得
+            imageFeature = imageFeatures.item().get('outimg/continuity_hue/All\\' + pathKey)[0]
 
             features.append(imageFeature)
 
-    np.save("ImageFeaturesSorted", features)
+    return np.array(features)
 
 def getTrainingdata():
     trainingFiles = glob.glob("TrainingData/*.csv")
 
-    #exportImageFeature()
+    #画像特徴量取得に関するインスタンス
+    #imageFeature = ImageFeature.ImageFeature()
+    #imageFeature.getFeaturesFromPath("outimg/continuity_hue/All/*.jpg", [])
+
     #画像特徴量の取得([5000, 特徴量次元数])
-    imageFeatues = np.load("ImageFeaturesSorted.npy")
+    imageFeatues = getSortedImageFeatures()
+    print("Sorted Image Features size : %s" % (str(imageFeatues.shape)))
 
     trainingLabel = np.empty(0, dtype=int)
     trainingFeature = np.empty((0, imageFeatues.shape[1]))
