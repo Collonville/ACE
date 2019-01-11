@@ -16,6 +16,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy import linalg, signal
 from scipy.optimize import *
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
 import ImageFeature
 
 win_unicode_console.enable()
@@ -81,6 +82,11 @@ feature[np.isnan(feature)] = 0
 
 #------------------------------------------------------------------------
 #訓練とテストデータを割合で分割
+
+X_train, X_test, y_train, y_test = train_test_split(feature, label, test_size=0.1)
+
+print(X_train.shape)
+sys.exit()
 trainNum = 15000
 testNum = label.shape[0] - trainNum
 
