@@ -25,6 +25,7 @@ def getImageRGBFromPath(filePath):
 #------------------------------------------------------------------------
 fileName = sys.argv[1]
 inputImgPath = "outimg/continuity_hue/All/" + fileName
+inputImgPath = "outimg/EnhacedImage/WithHue/Illust/" + fileName
 
 #学習済みパラメータの取得
 intercept = np.load("LogisticRegresion/intercept.npy")
@@ -38,8 +39,8 @@ imageFeature = ImageFeature.ImageFeature()
 
 features = np.empty((0, coef.shape[0]))
 
-initRGB = getImageRGBFromPath("img/All/" + fileName + ".jpg")
-
+#initRGB = getImageRGBFromPath("img/All/" + fileName + ".jpg")
+initRGB = []
 for it in range(100):
     rgb, imgH, imgW = getImageRGBFromPath(inputImgPath + "_" + str(it) + ".jpg")
 

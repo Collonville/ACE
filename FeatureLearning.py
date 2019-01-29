@@ -82,11 +82,11 @@ feature[np.isnan(feature)] = 0
 
 #------------------------------------------------------------------------
 #訓練とテストデータを割合で分割
-
+'''
 X_train, X_test, y_train, y_test = train_test_split(feature, label, test_size=0.1)
 
 print(X_train.shape)
-sys.exit()
+sys.exit()'''
 trainNum = 15000
 testNum = label.shape[0] - trainNum
 
@@ -130,7 +130,7 @@ print(predictor)
 '''
 
 #------------------------------------------------------------------------
-#学習の結果表示
+#学習の結果の保存
 np.save("LogisticRegresion/intercept", lr.intercept_)
 np.save("LogisticRegresion/coef", lr.coef_[0])
 

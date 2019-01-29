@@ -174,12 +174,12 @@ ITP2RGB = lambdify((I_, T_, P_), (ITP2RGB[0].subs([(I, I_), (T, T_), (P, P_)]), 
 #print(N(radsimp(LMS2ITP_Mat, 3)))
 
 #------------------------------------------------------------------------
-fileName = "s1306_9"
-inputImgPath = "img/Illust/" + fileName + ".jpg"
-outputImgPath = "outimg/continuity_hue/Illust/" + fileName
-doSignalConvert = False    #LED制御値補正
+fileName = "s496_1"
+inputImgPath = "img/All/" + fileName + ".jpg"
+outputImgPath = "outimg/EnhacedImage/WithHue/" + fileName
 doHueCorrection = True     #色相補正
 OUT_CONSECUTIVE_IMG = True #連続画像作成
+OUT_SIGNAL_IMG = True
 
 #Pathに日本語が含まれるとエラー
 inputImg = cv2.imread(inputImgPath, cv2.IMREAD_COLOR)
@@ -259,14 +259,25 @@ for it in range(MAX_ITER):
                 print("Iter:%2d, Enhance Loss=%f" % (k, enhanceLoss))
                 break
             else:
-                rgbBefore = np.deepcopy(mappedImg)
-
+                rgbBefore = copy.deepcopy(mappedImg)
 
     if OUT_CONSECUTIVE_IMG:
         img_ = np.clip(mappedImg, 0, 1)
         im = Image.fromarray(np.uint8(img_.reshape((inputImg.shape[0], inputImg.shape[1], 3)) * 255))
         im.save(outputImgPath + "_" + str(it) + ".jpg", quality=100)
     
+    if OUT_SIGNAL_IMG:
+        Ml = np.matrix([[0.7126, 0.1142, 0.0827],
+                    [0.0236, 0.3976, 0.0256],
+                    [0.0217, 0.0453, 0.5512]], dtype=np.float)
+    
+        signal = [np.dot(Ml, rgb) for rgb in mappedImg]
+        signalImg = np.array(signal)
+
+        img_ = np.clip(signalImg, 0, 1)
+        im = Image.fromarray(np.uint8(img_.reshape((inputImg.shape[0], inputImg.shape[1], 3)) * 255))
+        im.save("outimg/SignalImage/WithHue/" + fileName + "_" + str(it) + "_Signal.jpg", quality=100)
+
     gamma += 0.01
     alpha += np.abs(gamma) / 20
 
@@ -274,21 +285,11 @@ for it in range(MAX_ITER):
 print("Hue Loss : %f" % (np.sqrt(mean_squared_error(ITPHue(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2]), imgHue))))
 
 #------------------------------------------------------------------------
-#視覚実験に基づくLED制御値への変換
-if doSignalConvert:
-    Ml = np.matrix([[0.7126, 0.1142, 0.0827],
-                    [0.0236, 0.3976, 0.0256],
-                    [0.0217, 0.0453, 0.5512]], dtype=np.float)
-    
-    signal = [np.dot(Ml, rgb) for rgb in mappedImg]
-    mappedImg = np.array(signal)
 
-#------------------------------------------------------------------------
-
+'''
 #(H,W,3)に整形とクリップ処理
 mappedImg = np.clip(mappedImg.reshape((inputImg.shape[0], inputImg.shape[1], 3)), 0, 1)
 
-'''
 mappedxy = colour.XYZ_to_xy(colour.sRGB_to_XYZ(mappedImg))
 imagexy = colour.XYZ_to_xy(colour.sRGB_to_XYZ(RGB))
 #-----------------------------------------------
