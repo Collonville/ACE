@@ -12,6 +12,7 @@ from scipy.stats import entropy, kurtosis, skew
 from skimage import data, filters
 from skimage.measure import *
 from sklearn.metrics import mean_squared_error
+import datetime
 
 win_unicode_console.enable()
 
@@ -21,6 +22,7 @@ np.set_printoptions(precision=8, suppress=True, threshold=np.inf, linewidth=150)
 class ImageFeature:
     imgW = 50
     imgH = 50
+    numbers = re.compile(r'(\d+)')
 
     def getColorMoment(self, img, BIN_NUM=50):
         #www.kki.yamanashi.ac.jp/~ohbuchi/courses/2013/sm2013/pdf/sm13_lect01_20131007.pdf
@@ -33,6 +35,11 @@ class ImageFeature:
         rMean = np.mean(rChannel)
         gMean = np.mean(gChannel)
         bMean = np.mean(bChannel)
+
+        #中央値
+        rMedian = np.median(rChannel)
+        gMedian = np.median(gChannel)
+        bMedian = np.median(bChannel)
 
         #分散
         rVar = np.var(rChannel)
@@ -53,9 +60,9 @@ class ImageFeature:
         gKurt = kurtosis(gChannel)
         bKurt = kurtosis(bChannel)
 
-        rMoment = np.c_[rMean, rVar, rSkew, rKurt]
-        gMoment = np.c_[gMean, gVar, gSkew, gKurt]
-        bMoment = np.c_[bMean, bVar, bSkew, bKurt]
+        rMoment = np.c_[rMean, rMedian, rVar, rSkew, rKurt]
+        gMoment = np.c_[gMean, gMedian, gVar, gSkew, gKurt]
+        bMoment = np.c_[bMean, bMedian, bVar, bSkew, bKurt]
 
         return np.c_[rMoment, gMoment, bMoment], rgbCov
 
@@ -155,30 +162,28 @@ class ImageFeature:
         if(skin.shape[1] == 0):
             n_skin = 0
             S_skin = 0
-            N_skin = 0
         else:
             n_skin = skin.shape[1]
             S_skin = np.mean(skin)
 
-            N_skin = np.power(np.exp(-0.5 * ((S_skin - 0.76) / 0.52)**2), 4)
-
         if(grass.shape[1] == 0):
             n_grass = 0
             S_grass = 0
-            N_grass = 0
         else:   
             n_grass = grass.shape[1]
             S_grass = np.mean(grass)
-            N_grass = np.exp(-0.5 * ((S_grass - 0.81) / 0.53)**2)
 
         if(sky.shape[1] == 0):
             n_sky = 0
             S_sky = 0
-            N_sky = 0
         else:
             n_sky = sky.shape[1]
             S_sky = np.mean(sky)
-            N_sky = np.exp(-0.5 * ((S_sky - 0.43) / 0.22)**2)
+
+        #Calcurate local CNI value
+        N_skin = np.power(np.exp(-0.5 * ((S_skin - 0.76) / 0.52)**2), 4)
+        N_grass = np.exp(-0.5 * ((S_grass - 0.81) / 0.53)**2)
+        N_sky = np.exp(-0.5 * ((S_sky - 0.43) / 0.22)**2)
 
         return (n_skin * N_skin + n_grass * N_grass + n_sky * N_sky) / (n_skin + n_grass + n_sky)
 
@@ -202,9 +207,10 @@ class ImageFeature:
 
     #https://www.pyimagesearch.com/2015/03/23/sliding-windows-for-object-detection-with-python-and-opencv/
     def SlidingWindow(self, imgX, imgY, stepSize, windowSize):
-        for y in range(0, inputImg.shape[0], stepSize):
-            for x in range(0, inputImg.shape[1], stepSize):
+        for y in range(0, self.imgH, stepSize):
+            for x in range(0, self.imgW, stepSize):
                 yield imgX[y: y + windowSize, x: x + windowSize, :], imgY[y: y + windowSize, x: x + windowSize, :]
+
     def rgb2lab(self, rgb):
         RGB2LMS_Mat = np.matrix([
             [0.3811, 0.5783, 0.0402],
@@ -212,23 +218,39 @@ class ImageFeature:
             [0.0241, 0.1288, 0.8444]
         ])
 
-        #LMS = 
+        left = np.matrix([
+            [1 / np.sqrt(3), 0, 0],
+            [0, 1 / np.sqrt(6), 0],
+            [0, 0, 1 / np.sqrt(2)]
+        ])
+
+        middle = np.matrix([
+            [1,  1,  1],
+            [1,  1, -2],
+            [1, -1,  0]
+        ])
+
+        #labの計算
+        lab = left * middle * RGB2LMS_Mat * rgb.reshape(3, 1)
+
+        #matrix-->ndarrayへ変換
+        return np.array(lab).ravel()
+
     def ColorFidelityMetric(self, rgbX, rgbY):
         M = 0
         Q = 0
 
-        #W * H * 3に変形
-        rgbX_ = np.reshape(rgbX, (inputImg.shape[0], inputImg.shape[1], 3))
-        rgbY_ = np.reshape(rgbY, (inputImg.shape[0], inputImg.shape[1], 3))
+        #RGB-->lab(Not CIE Lab)
+        #内包forを使わない方法-->https://qiita.com/ysk24ok/items/5e16ed7d26695f0b9330
+        lab_X = np.apply_along_axis(self.rgb2lab, 1, rgbX)
+        lab_Y = np.apply_along_axis(self.rgb2lab, 1, rgbY)
 
-        #RGB-->Lab
-        XYZ_X = colour.sRGB_to_XYZ(rgbX_)
-        XYZ_Y = colour.sRGB_to_XYZ(rgbY_)
-        Lab_X = colour.XYZ_to_Lab(XYZ_X)
-        Lab_Y = colour.XYZ_to_Lab(XYZ_Y)
+        #W * H * 3に変形
+        lab_X = np.reshape(lab_X, (self.imgH, self.imgW, 3))
+        lab_Y = np.reshape(lab_Y, (self.imgH, self.imgW, 3))
 
         #ウィンドウサイズごとのFidelityMetricを計算
-        for (cropX, cropY) in SlidingWindow(Lab_X, Lab_Y, 1, 8):
+        for (cropX, cropY) in self.SlidingWindow(lab_X, lab_Y, 1, 8):
             # if the window does not meet our desired window size, ignore it
             if cropX.shape[0] != 8 or cropX.shape[1] != 8:
                 continue 
@@ -243,9 +265,9 @@ class ImageFeature:
             cropa_Y = cropY[:, :, 1].flatten()
             cropb_Y = cropY[:, :, 2].flatten()
 
-            Ql = FidelityMetric(cropL_X, cropL_Y)
-            Qa = FidelityMetric(cropa_X, cropa_Y)
-            Qb = FidelityMetric(cropb_X, cropb_Y)
+            Ql = self.FidelityMetric(cropL_X, cropL_Y)
+            Qa = self.FidelityMetric(cropa_X, cropa_Y)
+            Qb = self.FidelityMetric(cropb_X, cropb_Y)
 
             Q += np.sqrt(Ql**2 + Qa**2 + Qb**2)
 
@@ -253,24 +275,29 @@ class ImageFeature:
 
         return Q / M
 
-    numbers = re.compile(r'(\d+)')
-    def numericalSort(value):
-        parts = numbers.split(value)
+    
+    def numericalSort(self, value):
+        parts = self.numbers.split(value)
         parts[1::2] = map(int, parts[1::2])
         return parts
     
-    def getAllFeatures(self):
+    def getFeaturesFromPath(self, pathName, initrgb):
         #globだけではファイルの順列は保証されないためkey=numericalSortを用いる
-        imagesPath = sorted(glob.glob('outimg/continuity_hue/All/*.jpg'), key=numericalSort)
+        imagesPath = sorted(glob.glob(pathName), key=self.numericalSort)
 
         featuresWithPath={}
 
         for fileName in imagesPath:
+            print(fileName)
             inputImg = cv2.imread(fileName, cv2.IMREAD_COLOR)
 
             #正規化と整形
             inputImg = cv2.cvtColor(inputImg, cv2.COLOR_BGR2RGB) / 255.
-            rgb = np.reshape(inputImg, (inputImg.shape[0] * inputImg.shape[1], 3))
+
+            self.imgH = inputImg.shape[0]
+            self.imgW = inputImg.shape[1]
+
+            rgb = np.reshape(inputImg, (self.imgH * self.imgW, 3))
 
             moment, cov  = self.getColorMoment(rgb)
             aveGrads     = self.getAveGrad(rgb)
@@ -279,20 +306,22 @@ class ImageFeature:
             SatMeasures  = self.getSaturationMeasure(rgb)
             colorfulness = self.getColourFulness(rgb)
             naturalness  = self.getNaturalness(rgb)
+            
             #naturalnessの1301-1309でNanが発生
-            allFeatures = np.r_[moment, cov.flatten(), aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]
+            allFeatures = np.c_[moment, cov.flatten().reshape(1, -1), aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]
 
             #辞書型でファイル名と特徴量を紐づけ
             featuresWithPath[fileName] = allFeatures
 
         #numpyの保存形式で保存
         #https://stackoverflow.com/questions/40219946/python-save-dictionaries-through-numpy-save
-        np.save("ImageFeatures", featuresWithPath)
+        now = datetime.datetime.now()
+        np.save("ImageFeature/" + 'ImageFeaturesWithPath_' + str(len(imagesPath)) + 'image_' + str(allFeatures.shape[1]) + 'dim_{0:%Y%m%d_%H%M%S}'.format(now), featuresWithPath)
     
-    def getImageFeatureFromRGB(self, rgb):
+    def getImageFeatureFromRGB(self, rgb, imgH, imgW, initrgb):
+        self.imgH = imgH
+        self.imgW = imgW
 
-        return self.getNaturalness(rgb)
-        '''
         moment, cov  = self.getColorMoment(rgb)
         aveGrads     = self.getAveGrad(rgb)
         brightness   = self.getBrightnessMeasure(rgb)
@@ -300,5 +329,6 @@ class ImageFeature:
         SatMeasures  = self.getSaturationMeasure(rgb)
         colorfulness = self.getColourFulness(rgb)
         naturalness  = self.getNaturalness(rgb)
+        #fidelityMetric = self.ColorFidelityMetric(rgb, initrgb)
         
-        return np.c_[moment, cov.flatten().reshape(1, -1), aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]'''
+        return np.c_[moment, cov.flatten().reshape(1, -1), aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]
