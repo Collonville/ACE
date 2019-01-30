@@ -172,7 +172,7 @@ ITP2RGB = lambdify((I_, T_, P_), (ITP2RGB[0].subs([(I, I_), (T, T_), (P, P_)]), 
 
 #rgb --> ITPへ変換する式の整理版
 #print(N(radsimp(LMS2ITP_Mat, 3)))
-
+sys.exit()
 #------------------------------------------------------------------------
 fileName = "s1306_9"
 inputImgPath = "img/Illust/" + fileName + ".jpg"

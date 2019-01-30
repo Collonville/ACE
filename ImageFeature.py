@@ -155,28 +155,30 @@ class ImageFeature:
         if(skin.shape[1] == 0):
             n_skin = 0
             S_skin = 0
+            N_skin = 0
         else:
             n_skin = skin.shape[1]
             S_skin = np.mean(skin)
 
+            N_skin = np.power(np.exp(-0.5 * ((S_skin - 0.76) / 0.52)**2), 4)
+
         if(grass.shape[1] == 0):
             n_grass = 0
             S_grass = 0
+            N_grass = 0
         else:   
             n_grass = grass.shape[1]
             S_grass = np.mean(grass)
+            N_grass = np.exp(-0.5 * ((S_grass - 0.81) / 0.53)**2)
 
         if(sky.shape[1] == 0):
             n_sky = 0
             S_sky = 0
+            N_sky = 0
         else:
             n_sky = sky.shape[1]
             S_sky = np.mean(sky)
-
-        #Calcurate local CNI value
-        N_skin = np.power(np.exp(-0.5 * ((S_skin - 0.76) / 0.52)**2), 4)
-        N_grass = np.exp(-0.5 * ((S_grass - 0.81) / 0.53)**2)
-        N_sky = np.exp(-0.5 * ((S_sky - 0.43) / 0.22)**2)
+            N_sky = np.exp(-0.5 * ((S_sky - 0.43) / 0.22)**2)
 
         return (n_skin * N_skin + n_grass * N_grass + n_sky * N_sky) / (n_skin + n_grass + n_sky)
 
@@ -209,6 +211,8 @@ class ImageFeature:
             [0.1967, 0.7244, 0.0782],
             [0.0241, 0.1288, 0.8444]
         ])
+
+        #LMS = 
     def ColorFidelityMetric(self, rgbX, rgbY):
         M = 0
         Q = 0
@@ -286,6 +290,9 @@ class ImageFeature:
         np.save("ImageFeatures", featuresWithPath)
     
     def getImageFeatureFromRGB(self, rgb):
+
+        return self.getNaturalness(rgb)
+        '''
         moment, cov  = self.getColorMoment(rgb)
         aveGrads     = self.getAveGrad(rgb)
         brightness   = self.getBrightnessMeasure(rgb)
@@ -294,4 +301,4 @@ class ImageFeature:
         colorfulness = self.getColourFulness(rgb)
         naturalness  = self.getNaturalness(rgb)
         
-        return np.c_[moment, cov.flatten().reshape(1, -1), aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]
+        return np.c_[moment, cov.flatten().reshape(1, -1), aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]'''
