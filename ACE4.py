@@ -77,18 +77,28 @@ def computeOmegaTrans(width, height):
 
     return rfft(omega), omega
 
-def energy(I, I0, alpha, beta, gamma, width, height):
-    first = (alpha * 0.5) * np.sum((I - 0.5) ** 2)
+@numba.jit('f8[:](f8[:], f8[:], f8, f8[:], f8, f8, i4, i4)')
+def energy(I, I0, alpha, myu, beta, gamma, width, height):
+    first = 0
     second = 0
-    for y in range(height):
-        for x in range(width):
-            second += omega[y * width + x] * np.abs(I[x] - I0[y])
-    third = (beta * 0.5) * np.sum((I - I0) ** 2)
+    third = 0
 
-    return first - second + third
+    for colorCh in range(3):
+        #1項目：灰色仮説
+        first += alpha * 0.5 * np.sum((I[:, colorCh] - myu[colorCh]) ** 2)
 
-def s(r):
-    return np.minimum(np.maximum(alpha * r, -1), 1)
+        #2項目：入力画像との色差
+        second += beta * 0.5 * np.sum((I[:, colorCh] - I0[:, colorCh]) ** 2)
+
+        #3項目：ローカルコントラスト
+        for y in range(height):
+            for x in range(width):
+                third += omega[y * width + x] * np.abs(I[x, colorCh] - I[y, colorCh])
+    
+    #全エネルギーの合計
+    allEnergy = first + second - third
+
+    return np.c_[allEnergy, first, second, third]
 
 def ITP2ICH(ITP):
     C = np.sqrt(ITP[:, 1]**2 + ITP[:, 2]**2)
@@ -172,14 +182,15 @@ ITP2RGB = lambdify((I_, T_, P_), (ITP2RGB[0].subs([(I, I_), (T, T_), (P, P_)]), 
 
 #rgb --> ITPへ変換する式の整理版
 #print(N(radsimp(LMS2ITP_Mat, 3)))
-sys.exit()
+
 #------------------------------------------------------------------------
-fileName = "s496_1"
+fileName = "strawberry"
 inputImgPath = "img/All/" + fileName + ".jpg"
-outputImgPath = "outimg/EnhacedImage/WithHue/" + fileName
-doHueCorrection = True     #色相補正
+#outputImgPath = "outimg/EnhacedImage/WithHue/" + fileName
+outputImgPath = "outimg/ACE2/"
+doHueCorrection = False     #色相補正
 OUT_CONSECUTIVE_IMG = True #連続画像作成
-OUT_SIGNAL_IMG = True
+OUT_SIGNAL_IMG = False
 
 #Pathに日本語が含まれるとエラー
 inputImg = cv2.imread(inputImgPath, cv2.IMREAD_COLOR)
@@ -199,11 +210,11 @@ imgHue = ITPHue(RGB[:, 0], RGB[:, 1], RGB[:, 2])
 omegaFFT, omega = computeOmegaTrans(inputImg.shape[0], inputImg.shape[1])
 
 mappedImg = np.copy(RGB)
-myu = np.average(RGB, axis=0)
+myu = np.mean(RGB, axis=0)
 
 deltaT = 0.1
 gamma = 0.0
-alpha = np.abs(gamma) / 20
+alpha = 0.0
 beta = 1
 
 ratio = 0.5
@@ -213,17 +224,20 @@ MAX_ITER = 100
 feature = np.zeros((MAX_ITER, 4), dtype='float64')
 momentFeature = np.zeros((MAX_ITER, 12), dtype='float64')
 
+#エンハンスエネルギー
+E = np.empty((0, 4))
+
 for it in range(MAX_ITER):
     print("---------Iter:%2d, Gamma:%f, Alpha:%f---------" % (it, gamma, alpha))
 
     rgbBefore = np.zeros((inputImg.shape[0] * inputImg.shape[1], 3), dtype='float64')
     
-    for k in range(100):
+    for k in range(500):
         #エンハンス
         for colorCh in range(3):
-            contrast = RIslow(omegaFFT, mappedImg[:, colorCh], inputImg.shape[0], inputImg.shape[1], alpha)
-            molecule = mappedImg[:, colorCh] + deltaT * (beta * RGB[:, colorCh] + (0.5 * gamma * contrast))
-            mappedImg[:, colorCh] = molecule / (1 + deltaT * beta)
+            contrast = RIslow(omegaFFT, mappedImg[:, colorCh], inputImg.shape[0], inputImg.shape[1], 1)
+            molecule = mappedImg[:, colorCh] + deltaT * (alpha * myu[colorCh] + beta * RGB[:, colorCh] + (0.5 * gamma * contrast))
+            mappedImg[:, colorCh] = molecule / (1 + deltaT * (alpha + beta))
 
         #二乗平均平方根誤差(RMSE)
         enhanceLoss = np.sqrt(mean_squared_error(mappedImg, rgbBefore))
@@ -243,6 +257,8 @@ for it in range(MAX_ITER):
 
             #入力画像との色相差を計算
             hueLoss = np.sqrt(mean_squared_error(ITPHue(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2]), imgHue))
+        
+        E = np.r_[E, energy(mappedImg, RGB, alpha, myu, beta, gamma, inputImg.shape[0], inputImg.shape[1])]
 
         if doHueCorrection:
             allLoss = ratio * enhanceLoss + (1 - ratio) * hueLoss
@@ -255,7 +271,7 @@ for it in range(MAX_ITER):
                 lossBefore = allLoss
                 rgbBefore = copy.deepcopy(mappedImg)
         else:
-            if enhanceLoss < 1e-5:
+            if enhanceLoss < 1e-4:
                 print("Iter:%2d, Enhance Loss=%f" % (k, enhanceLoss))
                 break
             else:
@@ -264,7 +280,7 @@ for it in range(MAX_ITER):
     if OUT_CONSECUTIVE_IMG:
         img_ = np.clip(mappedImg, 0, 1)
         im = Image.fromarray(np.uint8(img_.reshape((inputImg.shape[0], inputImg.shape[1], 3)) * 255))
-        im.save(outputImgPath + "_" + str(it) + ".jpg", quality=100)
+        im.save(outputImgPath + fileName + "_" + str(it) + ".jpg", quality=100)
     
     if OUT_SIGNAL_IMG:
         Ml = np.matrix([[0.7126, 0.1142, 0.0827],
@@ -281,10 +297,26 @@ for it in range(MAX_ITER):
     gamma += 0.01
     alpha += np.abs(gamma) / 20
 
-#入力画像との色相の絶対平均誤差の計算
-print("Hue Loss : %f" % (np.sqrt(mean_squared_error(ITPHue(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2]), imgHue))))
+#入力画像との色相の二乗平均平方根誤差(RMSE)
+hueLoss = np.sqrt(mean_squared_error(ITPHue(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2]), imgHue))
+print("Hue Loss : %f" % hueLoss)
 
 #------------------------------------------------------------------------
+fig = plt.figure()
+fig.suptitle(fileName + ", Hue loss(RMSE)=" + str(hueLoss), fontsize=12, fontweight='bold')
+
+ax1 = fig.add_subplot(121)
+ax1.plot(E[:, 0], label="All Energy")
+ax1.plot(E[:, 1], label="First(Gray world)")
+ax1.plot(E[:, 2], label="Second(Diff from init)")
+ax1.legend(loc='upper left')
+ax1.grid()
+
+ax2 = fig.add_subplot(122)
+ax2.plot(E[:, 3], label="Third(Local contrast)")
+ax2.legend(loc='upper left')
+ax2.grid()
+plt.show()
 
 '''
 #(H,W,3)に整形とクリップ処理
@@ -331,7 +363,4 @@ ax3.imshow(img, interpolation='none')
 ax4.imshow(mappedImg, interpolation='none')
 
 plt.show()
-
-im = Image.fromarray(np.uint8(mappedImg.reshape((img.shape[0], img.shape[1], 3)) * 255))
-im.save(outputImgPath)
 '''
