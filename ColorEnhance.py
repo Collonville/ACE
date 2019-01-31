@@ -8,8 +8,6 @@ import numpy as np
 import win_unicode_console
 from colour.models import *
 from colour.plotting import *
-from skimage import filters
-from sklearn.metrics import mean_squared_error
 
 import ACE
 
@@ -295,13 +293,11 @@ print("Hue Loss : %f" % hueLoss)
 '''
 
 fileName = "strawberry"
-ace = ACE.ACE(fileName)
-sys.exit()
-energySet, hueLossSet = ace.doEnhanceMethod1()
+energySet, hueLossSet = ACE.doEnhanceMethod1(fileName)
 
 #------------------------------------------------------------------------
 fig = plt.figure()
-fig.suptitle(fileName + ", Final Hue loss(RMSE)=" + str(np.max(hueLossSet)), fontsize=12, fontweight='bold')
+fig.suptitle(fileName + ", Final Hue loss(RMSE)=", fontsize=12, fontweight='bold')
 
 ax1 = fig.add_subplot(131)
 ax1.plot(energySet[:, 0], label="All Energy")
@@ -315,8 +311,9 @@ ax2.plot(energySet[:, 3], label="Third(Local contrast)")
 ax2.legend(loc='upper left')
 ax2.grid()
 
-ax2 = fig.add_subplot(132)
-ax2.plot(hueLossSet, label="Hue loss(RMSE)")
-ax2.legend(loc='upper left')
-ax2.grid()
+ax3 = fig.add_subplot(132)
+ax3.plot(hueLossSet, label="Hue loss(RMSE)")
+ax3.legend(loc='upper left')
+ax3.grid()
+
 plt.show()
