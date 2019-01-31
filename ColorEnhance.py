@@ -1,35 +1,23 @@
-import copy
-import glob
-import itertools
-import math
 import sys
 
 import colour
 import matplotlib as mpl
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
-import numba
 import numpy as np
 import win_unicode_console
 from colour.models import *
 from colour.plotting import *
-from mpl_toolkits.mplot3d import Axes3D
-from PIL import Image, ImageColor
-from scipy import linalg, signal
-from scipy.fftpack import *
-from scipy.optimize import *
 from skimage import filters
 from sklearn.metrics import mean_squared_error
-from sympy import *
-from sympy.matrices import *
 
-import cv2
+import ACE
 
 win_unicode_console.enable()
 
 #表示のフォーマットを定義
 np.set_printoptions(precision=10, suppress=True, threshold=np.inf, linewidth=100)
-
+'''
 @numba.jit('f8[:](f8[:], f8[:], i8, i8, f4)')
 def RIslow(omega, I, width, height, alpha):
     valsum = np.zeros(width * height, dtype='float64')
@@ -221,16 +209,19 @@ ratio = 0.5
 lossBefore = 0
 
 MAX_ITER = 100
-feature = np.zeros((MAX_ITER, 4), dtype='float64')
-momentFeature = np.zeros((MAX_ITER, 12), dtype='float64')
+feature = np.zeros((MAX_ITER, 4))
+momentFeature = np.zeros((MAX_ITER, 12))
 
 #エンハンスエネルギー
-E = np.empty((0, 4))
+energySet = np.empty((0, 4))
+hueLossSet = np.empty(0)
+
+#ACEと色相保持を交互にする方法
 
 for it in range(MAX_ITER):
     print("---------Iter:%2d, Gamma:%f, Alpha:%f---------" % (it, gamma, alpha))
 
-    rgbBefore = np.zeros((inputImg.shape[0] * inputImg.shape[1], 3), dtype='float64')
+    rgbBefore = np.zeros((inputImg.shape[0] * inputImg.shape[1], 3))
     
     for k in range(500):
         #エンハンス
@@ -258,7 +249,7 @@ for it in range(MAX_ITER):
             #入力画像との色相差を計算
             hueLoss = np.sqrt(mean_squared_error(ITPHue(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2]), imgHue))
         
-        E = np.r_[E, energy(mappedImg, RGB, alpha, myu, beta, gamma, inputImg.shape[0], inputImg.shape[1])]
+        energySet = np.r_[energySet, energy(mappedImg, RGB, alpha, myu, beta, gamma, inputImg.shape[0], inputImg.shape[1])]
 
         if doHueCorrection:
             allLoss = ratio * enhanceLoss + (1 - ratio) * hueLoss
@@ -297,70 +288,35 @@ for it in range(MAX_ITER):
     gamma += 0.01
     alpha += np.abs(gamma) / 20
 
+
 #入力画像との色相の二乗平均平方根誤差(RMSE)
 hueLoss = np.sqrt(mean_squared_error(ITPHue(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2]), imgHue))
 print("Hue Loss : %f" % hueLoss)
+'''
+
+fileName = "strawberry"
+ace = ACE.ACE(fileName)
+sys.exit()
+energySet, hueLossSet = ace.doEnhanceMethod1()
 
 #------------------------------------------------------------------------
 fig = plt.figure()
-fig.suptitle(fileName + ", Hue loss(RMSE)=" + str(hueLoss), fontsize=12, fontweight='bold')
+fig.suptitle(fileName + ", Final Hue loss(RMSE)=" + str(np.max(hueLossSet)), fontsize=12, fontweight='bold')
 
-ax1 = fig.add_subplot(121)
-ax1.plot(E[:, 0], label="All Energy")
-ax1.plot(E[:, 1], label="First(Gray world)")
-ax1.plot(E[:, 2], label="Second(Diff from init)")
+ax1 = fig.add_subplot(131)
+ax1.plot(energySet[:, 0], label="All Energy")
+ax1.plot(energySet[:, 1], label="First(Gray world)")
+ax1.plot(energySet[:, 2], label="Second(Diff from init)")
 ax1.legend(loc='upper left')
 ax1.grid()
 
-ax2 = fig.add_subplot(122)
-ax2.plot(E[:, 3], label="Third(Local contrast)")
+ax2 = fig.add_subplot(132)
+ax2.plot(energySet[:, 3], label="Third(Local contrast)")
+ax2.legend(loc='upper left')
+ax2.grid()
+
+ax2 = fig.add_subplot(132)
+ax2.plot(hueLossSet, label="Hue loss(RMSE)")
 ax2.legend(loc='upper left')
 ax2.grid()
 plt.show()
-
-'''
-#(H,W,3)に整形とクリップ処理
-mappedImg = np.clip(mappedImg.reshape((inputImg.shape[0], inputImg.shape[1], 3)), 0, 1)
-
-mappedxy = colour.XYZ_to_xy(colour.sRGB_to_XYZ(mappedImg))
-imagexy = colour.XYZ_to_xy(colour.sRGB_to_XYZ(RGB))
-#-----------------------------------------------
-#データのプロット
-
-#色域、ホワイトポイントのプロット
-sRGBGamutBoundary = np.array([
-    [0.6400, 0.3300],
-    [0.3000, 0.6000],
-    [0.1500, 0.0600],
-    [0.6400, 0.3300]])
-
-fig = plt.figure()
-fig.suptitle('r-image of sRGB and LEDRGB', fontsize=14, fontweight='bold')
-
-ax1 = fig.add_subplot(221)
-colour.plotting.chromaticity_diagram_plot_CIE1931(bounding_box=(-0.1, 0.9, -0.1, 0.9), standalone=False)
-ax1.plot(sRGBGamutBoundary[:, 0], sRGBGamutBoundary[:, 1], color="black", linestyle='dotted')
-ax1.plot(sRGBGamutBoundary[:, 0], sRGBGamutBoundary[:, 1], 's', color="black", markersize=6, label="sRGB Gamut Boundary Point")
-ax1.plot(0.3127, 0.3290, 'v', color="black", markersize=4, label="sRGB WhitePoint")
-ax1.plot(imagexy[:, 0], imagexy[:, 1],  's', markersize=2, label="sRGB Pixel")
-ax1.legend()
-
-ax2 = fig.add_subplot(222)
-colour.plotting.chromaticity_diagram_plot_CIE1931(bounding_box=(-0.1, 0.9, -0.1, 0.9), standalone=False)
-ax2.plot(sRGBGamutBoundary[:, 0], sRGBGamutBoundary[:, 1], color="black", linestyle='dotted')
-ax2.plot(sRGBGamutBoundary[:, 0], sRGBGamutBoundary[:, 1], 's', color="black", markersize=6, label="sRGB Gamut Boundary Point")
-ax2.plot(0.3127, 0.3290, 'v', color="black", markersize=4, label="sRGB WhitePoint")
-ax2.plot(mappedxy[:, 0], mappedxy[:, 1],  's', markersize=2, label="Mapped Pixel")
-ax2.legend()
-
-ax3 = fig.add_subplot(223)
-ax4 = fig.add_subplot(224)
-
-ax3.set_title("Original Image")
-ax4.set_title("Mapped Image")
-
-ax3.imshow(img, interpolation='none')
-ax4.imshow(mappedImg, interpolation='none')
-
-plt.show()
-'''
