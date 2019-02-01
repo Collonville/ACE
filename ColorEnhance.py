@@ -311,7 +311,7 @@ ax2.plot(energySet[:, 3], label="Third(Local contrast)")
 ax2.legend(loc='upper left')
 ax2.grid()
 
-ax3 = fig.add_subplot(132)
+ax3 = fig.add_subplot(133)
 ax3.plot(hueLossSet, label="Hue loss(RMSE)")
 ax3.legend(loc='upper left')
 ax3.grid()

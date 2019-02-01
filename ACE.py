@@ -29,7 +29,7 @@ win_unicode_console.enable()
 #表示のフォーマットを定義
 np.set_printoptions(precision=10, suppress=True, threshold=np.inf, linewidth=100)
  
-@numba.jit('f8[:](f8[:], f8[:], i8, i8, f4)')
+@numba.jit('f8[:](f8[:], f8[:], i8, i8, f4)', nopython=True, parallel=True)
 def RIslow(omega, enhancedImg, imgH, imgW, slope):
     valsum = np.zeros(imgW * imgH)
 
@@ -78,7 +78,7 @@ def computeOmegaTrans(imgH, imgW):
 
     return rfft(omega), omega
 
-@numba.jit('f8[:](f8[:], f8[:], i8 , i8, f8[:], f8[:], f8, f8, f8)')
+@numba.jit('f8[:](f8[:], f8[:], i8 , i8, f8[:], f8[:], f8, f8, f8)', parallel=True)
 def imageEnergy(enhancedImg, Img0, imgH, imgW, omega, myu, alpha, beta, gamma):
     first = 0
     second = 0
@@ -218,11 +218,11 @@ def doEnhanceMethod1(fileName_):
     OUTPUT_SIGNAL_IMG      = False#制御値画像作成
  
     #ACEの計算に使う定数値
-    deltaT = 0.01
+    deltaT = 0.1
     alpha = 0.0
     beta = 1.0
     gamma = 0.0
-    slope = 1.0
+    slope = 0.2
  
     #入力画像、出力画像のパス
     fileName = fileName_
@@ -240,7 +240,7 @@ def doEnhanceMethod1(fileName_):
     #コントラストカーネル
     omegaFFT, omega = computeOmegaTrans(imgH, imgW)
 
-    ratio = 0.5
+    ratio = 0.15
     lossBefore = 0
 
     #エンハンスエネルギー
@@ -279,6 +279,7 @@ def doEnhanceMethod1(fileName_):
                 hueLoss = np.sqrt(mean_squared_error(ITPHue(enhancedImg[:, 0], enhancedImg[:, 1], enhancedImg[:, 2]), ITPHue0))
             
             energySet = np.r_[energySet, imageEnergy(enhancedImg, Img0, imgH, imgW, omega, myu, alpha, beta, gamma)]
+            hueLossSet = np.r_[hueLossSet, np.sqrt(mean_squared_error(ITPHue(enhancedImg[:, 0], enhancedImg[:, 1], enhancedImg[:, 2]), ITPHue0))]
 
             if DO_HUE_CORRECTION:
                 allLoss = ratio * enhanceLoss + (1 - ratio) * hueLoss
@@ -315,7 +316,7 @@ def doEnhanceMethod1(fileName_):
             im.save(signalImgOutputPath + fileName + "_" + str(it) + "_Signal.jpg", quality=100)
 
         gamma += 0.01
-        alpha += np.abs(gamma) / 20
+        alpha = np.abs(gamma) / 20
 
     #入力画像との色相の二乗平均平方根誤差(RMSE)
     hueLoss = np.sqrt(mean_squared_error(ITPHue(enhancedImg[:, 0], enhancedImg[:, 1], enhancedImg[:, 2]), ITPHue0))
