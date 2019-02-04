@@ -23,9 +23,8 @@ def getImageRGBFromPath(filePath):
     return rgb, inputImg.shape[0], inputImg.shape[1]
 
 #------------------------------------------------------------------------
-fileName = sys.argv[1]
-inputImgPath = "outimg/continuity_hue/All/" + fileName
-inputImgPath = "outimg/EnhacedImage/WithHue/Illust/" + fileName
+#読み込みたい画像集合のパス(例:outimg/ACE2/strawberry)
+inputImgPath = sys.argv[1]
 
 #学習済みパラメータの取得
 intercept = np.load("LogisticRegresion/intercept.npy")
@@ -56,6 +55,9 @@ features = scaler.transform(features)
 #選択確率の計算
 portion = intercept + np.dot(coef, features.T)
 propability = 1. / (1. + np.exp(-portion))
+
+#合計が1に正規化
+propability = propability / np.sum(propability)
 
 print("Max iter=%d, propability=%f" % (np.argmax(propability), np.max(propability)))
 plt.plot(propability)
