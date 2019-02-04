@@ -28,6 +28,8 @@ win_unicode_console.enable()
 
 #表示のフォーマットを定義
 np.set_printoptions(precision=10, suppress=True, threshold=np.inf, linewidth=100)
+
+
  
 @numba.jit('f8[:](f8[:], f8[:], i8, i8, f4)', nopython=True, parallel=True)
 def RIslow(omega, enhancedImg, imgH, imgW, slope):
@@ -61,7 +63,7 @@ def RI(self, img):
 def computeOmegaTrans(imgH, imgW):
     omegaDistanceFunc = "Euclidean"
 
-    omega = np.zeros(imgW * imgH)
+    omega = np.zeros(imgH * imgW)
 
     if omegaDistanceFunc is "Gaussian":
         sigma = 10
@@ -211,11 +213,17 @@ def readImage(inputImgPath, ITPHue):
 
     return rgb, myu, imgHue, inputImg.shape[0], inputImg.shape[1]
 
-def doEnhanceMethod1(fileName_):    
+def doEnhanceMethod1(fileName_):
+    global ITPHue
+    global HRedPartial
+    global HGrePartial
+    global HBluPartial
+    global ITPHue0
+
     MAX_ITER = 100
-    DO_HUE_CORRECTION      = False#色相補正
+    DO_HUE_CORRECTION      = True#色相補正
     OUTPUT_CONSECUTIVE_IMG = True#連続画像作成
-    OUTPUT_SIGNAL_IMG      = False#制御値画像作成
+    OUTPUT_SIGNAL_IMG      = True#制御値画像作成
  
     #ACEの計算に使う定数値
     deltaT = 0.1
@@ -227,20 +235,20 @@ def doEnhanceMethod1(fileName_):
     #入力画像、出力画像のパス
     fileName = fileName_
     inputImgPath = "img/All/" + fileName_ + ".jpg"
-    enhanceImgOutputPath = "outimg/ACE2/"
-    signalImgOutputPath = "outimg/ACE2/"
+    enhanceImgOutputPath = "outimg/ACE2/ACEMethod1/"
+    signalImgOutputPath = "outimg/ACE2/ACEMethod1/Signal/"
  
     #色相計算の微分関数
     ITPHue, HRedPartial, HGrePartial, HBluPartial = getITPPartial()
 
     #エンハンス対象の画像情報
-    Img0, myu, ITPHue0, imgW, imgH = readImage(inputImgPath, ITPHue)
+    Img0, myu, ITPHue0, imgH, imgW = readImage(inputImgPath, ITPHue)
     enhancedImg = np.copy(Img0)
 
     #コントラストカーネル
     omegaFFT, omega = computeOmegaTrans(imgH, imgW)
 
-    ratio = 0.15
+    ratio = 0.5
     lossBefore = 0
 
     #エンハンスエネルギー
@@ -282,14 +290,11 @@ def doEnhanceMethod1(fileName_):
             hueLossSet = np.r_[hueLossSet, np.sqrt(mean_squared_error(ITPHue(enhancedImg[:, 0], enhancedImg[:, 1], enhancedImg[:, 2]), ITPHue0))]
 
             if DO_HUE_CORRECTION:
-                allLoss = ratio * enhanceLoss + (1 - ratio) * hueLoss
-                loss = np.abs(allLoss - lossBefore)
-                print("Iter:%2d, k:%4d, All Loss=%f, Enhance Loss=%f, Hue Loss=%f" % (it, k, loss, enhanceLoss, hueLoss))
+                print("Iter:%2d, k:%4d, Enhance Loss=%f, Hue Loss=%f" % (it, k, enhanceLoss, hueLoss))
                 
-                if loss < 1e-4:
+                if enhanceLoss < 1e-4:
                     break
                 else:
-                    lossBefore = allLoss
                     rgbBefore = copy.deepcopy(enhancedImg)
             else:
                 if enhanceLoss < 1e-4:
@@ -312,7 +317,7 @@ def doEnhanceMethod1(fileName_):
             signalImg = np.array(signal)
 
             img_ = np.clip(signalImg, 0, 1)
-            im = Image.fromarray(np.uint8(img_.reshape((imgH * imgW, 3)) * 255))
+            im = Image.fromarray(np.uint8(img_.reshape((imgH, imgW, 3)) * 255))
             im.save(signalImgOutputPath + fileName + "_" + str(it) + "_Signal.jpg", quality=100)
 
         gamma += 0.01
