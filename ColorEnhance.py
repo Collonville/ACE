@@ -291,7 +291,7 @@ for it in range(MAX_ITER):
 hueLoss = np.sqrt(mean_squared_error(ITPHue(mappedImg[:, 0], mappedImg[:, 1], mappedImg[:, 2]), imgHue))
 print("Hue Loss : %f" % hueLoss)
 '''
-
+fileName = sys.argv[2]
 energySet, hueLossSet = ACE.doEnhanceMethod1(sys.argv[1], sys.argv[2], "outimg/ACE2/ACEMethod1/", "outimg/ACE2/ACEMethod1/Signal/")
 
 #------------------------------------------------------------------------
