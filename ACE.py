@@ -328,3 +328,114 @@ def doEnhanceMethod1(fileName_):
     print("Hue Loss : %f" % hueLoss)
 
     return energySet, hueLossSet
+
+def doEnhanceMethod2(fileName_):
+    global ITPHue
+    global HRedPartial
+    global HGrePartial
+    global HBluPartial
+    global ITPHue0
+
+    MAX_ITER = 100
+    DO_HUE_CORRECTION      = True#色相補正
+    OUTPUT_CONSECUTIVE_IMG = True#連続画像作成
+    OUTPUT_SIGNAL_IMG      = True#制御値画像作成
+ 
+    #ACEの計算に使う定数値
+    deltaT = 0.1
+    alpha = 0.0
+    beta = 1.0
+    gamma = 0.0
+    slope = 0.2
+ 
+    #入力画像、出力画像のパス
+    fileName = fileName_
+    inputImgPath = "img/All/" + fileName_ + ".jpg"
+    enhanceImgOutputPath = "outimg/ACE2/ACEMethod2/"
+    signalImgOutputPath = "outimg/ACE2/ACEMethod2/Signal/"
+ 
+    #色相計算の微分関数
+    ITPHue, HRedPartial, HGrePartial, HBluPartial = getITPPartial()
+
+    #エンハンス対象の画像情報
+    Img0, myu, ITPHue0, imgH, imgW = readImage(inputImgPath, ITPHue)
+    enhancedImg = np.copy(Img0)
+
+    #コントラストカーネル
+    omegaFFT, omega = computeOmegaTrans(imgH, imgW)
+
+    ratio = 0.5
+    lossBefore = 0
+
+    #エンハンスエネルギー
+    energySet = np.empty((0, 4))
+    hueLossSet = np.empty(0)
+
+    for it in range(MAX_ITER):
+        print("---------Iter:%2d, Gamma:%f, Alpha:%f---------" % (it, gamma, alpha))
+
+        rgbBefore = np.zeros((imgH * imgW, 3))
+        
+        for k in range(500):
+            #エンハンス
+            for colorCh in range(3):
+                contrast = RIslow(omegaFFT, enhancedImg[:, colorCh], imgH, imgW, slope)
+                molecule = enhancedImg[:, colorCh] + deltaT * (alpha * myu[colorCh] + beta * Img0[:, colorCh] + (0.5 * gamma * contrast))
+                enhancedImg[:, colorCh] = molecule / (1 + deltaT * (alpha + beta))
+
+            #二乗平均平方根誤差(RMSE)
+            enhanceLoss = np.sqrt(mean_squared_error(enhancedImg, rgbBefore))
+
+            energySet = np.r_[energySet, imageEnergy(enhancedImg, Img0, imgH, imgW, omega, myu, alpha, beta, gamma)]
+            
+
+            if enhanceLoss < 1e-5:
+                print("Enhance Iter:%2d, Enhance Loss=%f" % (k, enhanceLoss))
+                break
+            else:
+                rgbBefore = copy.deepcopy(enhancedImg)
+        
+        #色相修正
+        if DO_HUE_CORRECTION:
+            #最適化
+            hueOpt = minimize(optimaizeFunc, enhancedImg.flatten('F'), 
+                                method='CG',  
+                                options={'gtol': 1e-8, 'disp': False},
+                                jac=optimaizeFuncGradient
+                            )
+
+            #最適化結果を整形
+            r, g, b = np.split(hueOpt.x, 3)
+            enhancedImg = np.c_[r, g, b]
+
+            #入力画像との色相差を計算
+            hueLoss = np.sqrt(mean_squared_error(ITPHue(enhancedImg[:, 0], enhancedImg[:, 1], enhancedImg[:, 2]), ITPHue0))
+            print(hueLoss)
+        
+        hueLossSet = np.r_[hueLossSet, np.sqrt(mean_squared_error(ITPHue(enhancedImg[:, 0], enhancedImg[:, 1], enhancedImg[:, 2]), ITPHue0))]
+
+        if OUTPUT_CONSECUTIVE_IMG:
+            img_ = np.clip(enhancedImg, 0, 1)
+            im = Image.fromarray(np.uint8(img_.reshape((imgH, imgW, 3)) * 255))
+            im.save(enhanceImgOutputPath + fileName + "_" + str(it) + ".jpg", quality=100)
+        
+        if OUTPUT_SIGNAL_IMG:
+            Ml = np.matrix([[0.7126, 0.1142, 0.0827],
+                            [0.0236, 0.3976, 0.0256],
+                            [0.0217, 0.0453, 0.5512]], dtype=np.float)
+        
+            signal = [np.dot(Ml, rgb) for rgb in enhancedImg]
+            signalImg = np.array(signal)
+
+            img_ = np.clip(signalImg, 0, 1)
+            im = Image.fromarray(np.uint8(img_.reshape((imgH, imgW, 3)) * 255))
+            im.save(signalImgOutputPath + fileName + "_" + str(it) + "_Signal.jpg", quality=100)
+
+        gamma += 0.01
+        alpha = np.abs(gamma) / 20
+
+    #入力画像との色相の二乗平均平方根誤差(RMSE)
+    hueLoss = np.sqrt(mean_squared_error(ITPHue(enhancedImg[:, 0], enhancedImg[:, 1], enhancedImg[:, 2]), ITPHue0))
+    print("Hue Loss : %f" % hueLoss)
+
+    return energySet, hueLossSet

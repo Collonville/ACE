@@ -292,8 +292,8 @@ hueLoss = np.sqrt(mean_squared_error(ITPHue(mappedImg[:, 0], mappedImg[:, 1], ma
 print("Hue Loss : %f" % hueLoss)
 '''
 
-fileName = "ara-3695678__340"
-energySet, hueLossSet = ACE.doEnhanceMethod1(fileName)
+fileName = sys.argv[1]
+energySet, hueLossSet = ACE.doEnhanceMethod2(fileName)
 
 #------------------------------------------------------------------------
 fig = plt.figure()
