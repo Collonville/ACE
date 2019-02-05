@@ -20,11 +20,11 @@ def getImageRGBFromPath(filePath):
     inputImg = cv2.cvtColor(inputImg, cv2.COLOR_BGR2RGB) / 255.
     rgb = np.reshape(inputImg, (inputImg.shape[0] * inputImg.shape[1], 3))
 
-    return rgb 
+    return rgb, inputImg.shape[0], inputImg.shape[1]
 
 #------------------------------------------------------------------------
-fileName = sys.argv[1]
-inputImgPath = "outimg/continuity_hue/All/" + fileName
+#読み込みたい画像集合のパス(例:outimg/ACE2/strawberry)
+inputImgPath = sys.argv[1]
 
 #学習済みパラメータの取得
 intercept = np.load("LogisticRegresion/intercept.npy")
@@ -38,13 +38,13 @@ imageFeature = ImageFeature.ImageFeature()
 
 features = np.empty((0, coef.shape[0]))
 
-initRGB = getImageRGBFromPath("img/All/" + fileName + ".jpg")
-
+#initRGB = getImageRGBFromPath("img/All/" + fileName + ".jpg")
+initRGB = []
 for it in range(100):
-    rgb = getImageRGBFromPath(inputImgPath + "_" + str(it) + ".jpg")
+    rgb, imgH, imgW = getImageRGBFromPath(inputImgPath + "_" + str(it) + ".jpg")
 
     #特徴量の取得
-    feature = imageFeature.getImageFeatureFromRGB(rgb, initRGB)
+    feature = imageFeature.getImageFeatureFromRGB(rgb, imgH, imgW, initRGB)
     feature[np.isnan(feature)] = 0
 
     features = np.r_[features, feature]
@@ -55,6 +55,9 @@ features = scaler.transform(features)
 #選択確率の計算
 portion = intercept + np.dot(coef, features.T)
 propability = 1. / (1. + np.exp(-portion))
+
+#合計が1に正規化
+propability = propability / np.sum(propability)
 
 print("Max iter=%d, propability=%f" % (np.argmax(propability), np.max(propability)))
 plt.plot(propability)
