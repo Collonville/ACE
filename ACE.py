@@ -222,7 +222,7 @@ def doEnhanceMethod1(inputImgPath_, fileName_, enhanceImgOutputPath_, signalImgO
     global ITPHue0
 
     MAX_ITER = 100
-    DO_HUE_CORRECTION      = True#色相補正
+    DO_HUE_CORRECTION      = False#色相補正
     OUTPUT_CONSECUTIVE_IMG = True#連続画像作成
     OUTPUT_SIGNAL_IMG      = True#制御値画像作成
  
