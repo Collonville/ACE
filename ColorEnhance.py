@@ -292,12 +292,12 @@ hueLoss = np.sqrt(mean_squared_error(ITPHue(mappedImg[:, 0], mappedImg[:, 1], ma
 print("Hue Loss : %f" % hueLoss)
 '''
 
-fileName = "s35_8"
+fileName = "ara-3695678__340"
 energySet, hueLossSet = ACE.doEnhanceMethod1(fileName)
 
 #------------------------------------------------------------------------
 fig = plt.figure()
-fig.suptitle(fileName + ", Without hue correction", fontsize=12, fontweight='bold')
+fig.suptitle(fileName + ", With hue correction", fontsize=12, fontweight='bold')
 
 ax1 = fig.add_subplot(131)
 ax1.plot(energySet[:, 0], label="All Energy")
