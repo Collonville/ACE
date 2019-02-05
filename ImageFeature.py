@@ -326,5 +326,8 @@ class ImageFeature:
         colorfulness = self.getColourFulness(rgb)
         naturalness  = self.getNaturalness(rgb)
         #fidelityMetric = self.ColorFidelityMetric(rgb, initrgb)
+
+        print(cov)
+        sys.exit()
         
         return np.c_[moment, cov.flatten().reshape(1, -1), aveGrads, brightness, contrast, SatMeasures, colorfulness, naturalness]

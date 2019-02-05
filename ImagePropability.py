@@ -20,7 +20,7 @@ def getImageRGBFromPath(filePath):
     inputImg = cv2.cvtColor(inputImg, cv2.COLOR_BGR2RGB) / 255.
     rgb = np.reshape(inputImg, (inputImg.shape[0] * inputImg.shape[1], 3))
 
-    return rgb
+    return rgb 
 
 #------------------------------------------------------------------------
 fileName = sys.argv[1]
