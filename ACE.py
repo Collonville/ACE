@@ -261,7 +261,7 @@ def doEnhanceMethod1(inputImgPath_, fileName_, enhanceImgOutputPath_, signalImgO
 
         rgbBefore = np.zeros((imgH * imgW, 3))
         
-        for k in range(100):
+        for k in range(500):
             #エンハンス
             for colorCh in range(3):
                 contrast = RIslow(omegaFFT, enhancedImg[:, colorCh], imgH, imgW, slope)
