@@ -194,10 +194,11 @@ def getITPPartial():
 
 def readImage(inputImgPath, ITPHue):
     #Pathに日本語が含まれるとエラー
+    print(inputImgPath)
     inputImg = cv2.imread(inputImgPath, cv2.IMREAD_COLOR)
 
     #正規化と整形
-    inputImg = cv2.cvtColor(inputImg, cv2.COLOR_BGR2RGB) / 255.
+    inputImg = cv2.cvtColor(inputImg, cv2.COLOR_BGRA2RGB) / 255.
     rgb = np.reshape(inputImg, (inputImg.shape[0] * inputImg.shape[1], 3))
 
     myu = np.mean(rgb, axis=0)
@@ -213,7 +214,7 @@ def readImage(inputImgPath, ITPHue):
 
     return rgb, myu, imgHue, inputImg.shape[0], inputImg.shape[1]
 
-def doEnhanceMethod1(fileName_):
+def doEnhanceMethod1(inputImgPath_, fileName_, enhanceImgOutputPath_, signalImgOutputPath_):
     global ITPHue
     global HRedPartial
     global HGrePartial
@@ -234,9 +235,9 @@ def doEnhanceMethod1(fileName_):
  
     #入力画像、出力画像のパス
     fileName = fileName_
-    inputImgPath = "img/All/" + fileName_ + ".jpg"
-    enhanceImgOutputPath = "outimg/ACE2/ACEMethod1/"
-    signalImgOutputPath = "outimg/ACE2/ACEMethod1/Signal/"
+    inputImgPath = inputImgPath_ + fileName_
+    enhanceImgOutputPath = enhanceImgOutputPath_
+    signalImgOutputPath = signalImgOutputPath_
  
     #色相計算の微分関数
     ITPHue, HRedPartial, HGrePartial, HBluPartial = getITPPartial()
@@ -260,7 +261,7 @@ def doEnhanceMethod1(fileName_):
 
         rgbBefore = np.zeros((imgH * imgW, 3))
         
-        for k in range(80):
+        for k in range(100):
             #エンハンス
             for colorCh in range(3):
                 contrast = RIslow(omegaFFT, enhancedImg[:, colorCh], imgH, imgW, slope)
