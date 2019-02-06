@@ -163,13 +163,13 @@ def getITPPartial():
     ITP_T_RedPartial = diff(RGB2ITP[1], r) # 0.152
     ITP_T_GrePartial = diff(RGB2ITP[1], g) #-1.41
     ITP_T_BluPartial = diff(RGB2ITP[1], b) # 1.26
-    print("CT Partial. Tred=%f, Tblue=%f, Tgreen= %f" % (ITP_T_RedPartial, ITP_T_GrePartial, ITP_T_BluPartial))
+    #print("CT Partial. Tred=%f, Tblue=%f, Tgreen= %f" % (ITP_T_RedPartial, ITP_T_GrePartial, ITP_T_BluPartial))
 
     #P値の偏微分
     ITP_P_RedPartial = diff(RGB2ITP[2], r) # 1.09
     ITP_P_GrePartial = diff(RGB2ITP[2], g) #-0.775
     ITP_P_BluPartial = diff(RGB2ITP[2], b) #-0.318
-    print("CP Partial. Pred=%f, Pblue=%f, Pgreen= %f" % (ITP_P_RedPartial, ITP_P_GrePartial, ITP_P_BluPartial))
+    #print("CP Partial. Pred=%f, Pblue=%f, Pgreen= %f" % (ITP_P_RedPartial, ITP_P_GrePartial, ITP_P_BluPartial))
 
     #色相関数の偏微分
     HRedPartial = diff(ITPHue, r)
@@ -194,7 +194,6 @@ def getITPPartial():
 
 def readImage(inputImgPath, ITPHue):
     #Pathに日本語が含まれるとエラー
-    print(inputImgPath)
     inputImg = cv2.imread(inputImgPath, cv2.IMREAD_COLOR)
 
     #正規化と整形
@@ -212,9 +211,11 @@ def readImage(inputImgPath, ITPHue):
     #入力画像の色相値([-pi, pi])
     imgHue = ITPHue(rgb[:, 0], rgb[:, 1], rgb[:, 2])
 
+    print("Input image:%s, Height=%d, Width=%d" % (inputImgPath, inputImg.shape[0], inputImg.shape[1]))
+
     return rgb, myu, imgHue, inputImg.shape[0], inputImg.shape[1]
 
-def doEnhanceMethod1(inputImgPath_, fileName_, enhanceImgOutputPath_, signalImgOutputPath_):
+def doEnhance(method, inputImgPath_, fileName_, enhanceImgOutputPath_, signalImgOutputPath_):
     global ITPHue
     global HRedPartial
     global HGrePartial
@@ -256,27 +257,106 @@ def doEnhanceMethod1(inputImgPath_, fileName_, enhanceImgOutputPath_, signalImgO
     energySet = np.empty((0, 4))
     hueLossSet = np.empty(0)
 
-    for it in range(MAX_ITER):
-        print("---------Iter:%2d, Gamma:%f, Alpha:%f---------" % (it, gamma, alpha))
+    if method == "ACE1":
+        print("Running ACE1")
+        for it in range(MAX_ITER):
+            print("---------Iter:%2d, Gamma:%f, Alpha:%f---------" % (it, gamma, alpha))
 
-        rgbBefore = np.zeros((imgH * imgW, 3))
-        
-        for k in range(500):
-            #エンハンス
-            for colorCh in range(3):
-                contrast = RIslow(omegaFFT, enhancedImg[:, colorCh], imgH, imgW, slope)
-                molecule = enhancedImg[:, colorCh] + deltaT * (alpha * myu[colorCh] + beta * Img0[:, colorCh] + (0.5 * gamma * contrast))
-                enhancedImg[:, colorCh] = molecule / (1 + deltaT * (alpha + beta))
+            rgbBefore = np.zeros((imgH * imgW, 3))
+            
+            for k in range(500):
+                #エンハンス
+                for colorCh in range(3):
+                    contrast = RIslow(omegaFFT, enhancedImg[:, colorCh], imgH, imgW, slope)
+                    molecule = enhancedImg[:, colorCh] + deltaT * (alpha * myu[colorCh] + beta * Img0[:, colorCh] + (0.5 * gamma * contrast))
+                    enhancedImg[:, colorCh] = molecule / (1 + deltaT * (alpha + beta))
 
-            #二乗平均平方根誤差(RMSE)
-            enhanceLoss = np.sqrt(mean_squared_error(enhancedImg, rgbBefore))
+                #二乗平均平方根誤差(RMSE)
+                enhanceLoss = np.sqrt(mean_squared_error(enhancedImg, rgbBefore))
 
+                #色相修正
+                if DO_HUE_CORRECTION:
+                    #最適化
+                    hueOpt = minimize(optimaizeFunc, enhancedImg.flatten('F'), 
+                                        method='CG',  
+                                        options={'gtol': 1e-5, 'disp': False},
+                                        jac=optimaizeFuncGradient
+                                    )
+
+                    #最適化結果を整形
+                    r, g, b = np.split(hueOpt.x, 3)
+                    enhancedImg = np.c_[r, g, b]
+
+                    #入力画像との色相差を計算
+                    hueLoss = np.sqrt(mean_squared_error(ITPHue(enhancedImg[:, 0], enhancedImg[:, 1], enhancedImg[:, 2]), ITPHue0))
+                
+                energySet = np.r_[energySet, imageEnergy(enhancedImg, Img0, imgH, imgW, omega, myu, alpha, beta, gamma)]
+                hueLossSet = np.r_[hueLossSet, np.sqrt(mean_squared_error(ITPHue(enhancedImg[:, 0], enhancedImg[:, 1], enhancedImg[:, 2]), ITPHue0))]
+
+                if DO_HUE_CORRECTION:
+                    print("Iter:%2d, k:%4d, Enhance Loss=%f, Hue Loss=%f" % (it, k, enhanceLoss, hueLoss))
+                    
+                    if enhanceLoss < 1e-4:
+                        break
+                    else:
+                        rgbBefore = copy.deepcopy(enhancedImg)
+                else:
+                    if enhanceLoss < 1e-4:
+                        print("Iter:%2d, Enhance Loss=%f" % (k, enhanceLoss))
+                        break
+                    else:
+                        rgbBefore = copy.deepcopy(enhancedImg)
+
+            if OUTPUT_CONSECUTIVE_IMG:
+                img_ = np.clip(enhancedImg, 0, 1)
+                im = Image.fromarray(np.uint8(img_.reshape((imgH, imgW, 3)) * 255))
+                im.save(enhanceImgOutputPath + fileName + "_" + str(it) + ".jpg", quality=100)
+            
+            if OUTPUT_SIGNAL_IMG:
+                Ml = np.matrix([[0.7126, 0.1142, 0.0827],
+                                [0.0236, 0.3976, 0.0256],
+                                [0.0217, 0.0453, 0.5512]], dtype=np.float)
+            
+                signal = [np.dot(Ml, rgb) for rgb in enhancedImg]
+                signalImg = np.array(signal)
+
+                img_ = np.clip(signalImg, 0, 1)
+                im = Image.fromarray(np.uint8(img_.reshape((imgH, imgW, 3)) * 255))
+                im.save(signalImgOutputPath + fileName + "_" + str(it) + "_Signal.jpg", quality=100)
+
+            gamma += 0.01
+            alpha = np.abs(gamma) / 20
+    elif method == "ACE2":
+        print("Running ACE2")
+        for it in range(MAX_ITER):
+            print("---------Iter:%2d, Gamma:%f, Alpha:%f---------" % (it, gamma, alpha))
+
+            rgbBefore = np.zeros((imgH * imgW, 3))
+            
+            for k in range(500):
+                #エンハンス
+                for colorCh in range(3):
+                    contrast = RIslow(omegaFFT, enhancedImg[:, colorCh], imgH, imgW, slope)
+                    molecule = enhancedImg[:, colorCh] + deltaT * (alpha * myu[colorCh] + beta * Img0[:, colorCh] + (0.5 * gamma * contrast))
+                    enhancedImg[:, colorCh] = molecule / (1 + deltaT * (alpha + beta))
+
+                #二乗平均平方根誤差(RMSE)
+                enhanceLoss = np.sqrt(mean_squared_error(enhancedImg, rgbBefore))
+
+                energySet = np.r_[energySet, imageEnergy(enhancedImg, Img0, imgH, imgW, omega, myu, alpha, beta, gamma)]
+                
+                if enhanceLoss < 1e-5:
+                    print("Enhance Iter:%2d, Enhance Loss=%f" % (k, enhanceLoss))
+                    break
+                else:
+                    rgbBefore = copy.deepcopy(enhancedImg)
+            
             #色相修正
             if DO_HUE_CORRECTION:
                 #最適化
                 hueOpt = minimize(optimaizeFunc, enhancedImg.flatten('F'), 
                                     method='CG',  
-                                    options={'gtol': 1e-5, 'disp': False},
+                                    options={'gtol': 1e-8, 'disp': False},
                                     jac=optimaizeFuncGradient
                                 )
 
@@ -286,154 +366,32 @@ def doEnhanceMethod1(inputImgPath_, fileName_, enhanceImgOutputPath_, signalImgO
 
                 #入力画像との色相差を計算
                 hueLoss = np.sqrt(mean_squared_error(ITPHue(enhancedImg[:, 0], enhancedImg[:, 1], enhancedImg[:, 2]), ITPHue0))
+                print(hueLoss)
             
-            energySet = np.r_[energySet, imageEnergy(enhancedImg, Img0, imgH, imgW, omega, myu, alpha, beta, gamma)]
             hueLossSet = np.r_[hueLossSet, np.sqrt(mean_squared_error(ITPHue(enhancedImg[:, 0], enhancedImg[:, 1], enhancedImg[:, 2]), ITPHue0))]
 
-            if DO_HUE_CORRECTION:
-                print("Iter:%2d, k:%4d, Enhance Loss=%f, Hue Loss=%f" % (it, k, enhanceLoss, hueLoss))
-                
-                if enhanceLoss < 1e-4:
-                    break
-                else:
-                    rgbBefore = copy.deepcopy(enhancedImg)
-            else:
-                if enhanceLoss < 1e-4:
-                    print("Iter:%2d, Enhance Loss=%f" % (k, enhanceLoss))
-                    break
-                else:
-                    rgbBefore = copy.deepcopy(enhancedImg)
-
-        if OUTPUT_CONSECUTIVE_IMG:
-            img_ = np.clip(enhancedImg, 0, 1)
-            im = Image.fromarray(np.uint8(img_.reshape((imgH, imgW, 3)) * 255))
-            im.save(enhanceImgOutputPath + fileName + "_" + str(it) + ".jpg", quality=100)
-        
-        if OUTPUT_SIGNAL_IMG:
-            Ml = np.matrix([[0.7126, 0.1142, 0.0827],
-                            [0.0236, 0.3976, 0.0256],
-                            [0.0217, 0.0453, 0.5512]], dtype=np.float)
-        
-            signal = [np.dot(Ml, rgb) for rgb in enhancedImg]
-            signalImg = np.array(signal)
-
-            img_ = np.clip(signalImg, 0, 1)
-            im = Image.fromarray(np.uint8(img_.reshape((imgH, imgW, 3)) * 255))
-            im.save(signalImgOutputPath + fileName + "_" + str(it) + "_Signal.jpg", quality=100)
-
-        gamma += 0.01
-        alpha = np.abs(gamma) / 20
-
-    #入力画像との色相の二乗平均平方根誤差(RMSE)
-    hueLoss = np.sqrt(mean_squared_error(ITPHue(enhancedImg[:, 0], enhancedImg[:, 1], enhancedImg[:, 2]), ITPHue0))
-    print("Hue Loss : %f" % hueLoss)
-
-    return energySet, hueLossSet
-
-def doEnhanceMethod2(fileName_):
-    global ITPHue
-    global HRedPartial
-    global HGrePartial
-    global HBluPartial
-    global ITPHue0
-
-    MAX_ITER = 100
-    DO_HUE_CORRECTION      = True#色相補正
-    OUTPUT_CONSECUTIVE_IMG = True#連続画像作成
-    OUTPUT_SIGNAL_IMG      = True#制御値画像作成
- 
-    #ACEの計算に使う定数値
-    deltaT = 0.1
-    alpha = 0.0
-    beta = 1.0
-    gamma = 0.0
-    slope = 0.2
- 
-    #入力画像、出力画像のパス
-    fileName = fileName_
-    inputImgPath = "img/All/" + fileName_ + ".jpg"
-    enhanceImgOutputPath = "outimg/ACE2/ACEMethod2/"
-    signalImgOutputPath = "outimg/ACE2/ACEMethod2/Signal/"
- 
-    #色相計算の微分関数
-    ITPHue, HRedPartial, HGrePartial, HBluPartial = getITPPartial()
-
-    #エンハンス対象の画像情報
-    Img0, myu, ITPHue0, imgH, imgW = readImage(inputImgPath, ITPHue)
-    enhancedImg = np.copy(Img0)
-
-    #コントラストカーネル
-    omegaFFT, omega = computeOmegaTrans(imgH, imgW)
-
-    ratio = 0.5
-    lossBefore = 0
-
-    #エンハンスエネルギー
-    energySet = np.empty((0, 4))
-    hueLossSet = np.empty(0)
-
-    for it in range(MAX_ITER):
-        print("---------Iter:%2d, Gamma:%f, Alpha:%f---------" % (it, gamma, alpha))
-
-        rgbBefore = np.zeros((imgH * imgW, 3))
-        
-        for k in range(500):
-            #エンハンス
-            for colorCh in range(3):
-                contrast = RIslow(omegaFFT, enhancedImg[:, colorCh], imgH, imgW, slope)
-                molecule = enhancedImg[:, colorCh] + deltaT * (alpha * myu[colorCh] + beta * Img0[:, colorCh] + (0.5 * gamma * contrast))
-                enhancedImg[:, colorCh] = molecule / (1 + deltaT * (alpha + beta))
-
-            #二乗平均平方根誤差(RMSE)
-            enhanceLoss = np.sqrt(mean_squared_error(enhancedImg, rgbBefore))
-
-            energySet = np.r_[energySet, imageEnergy(enhancedImg, Img0, imgH, imgW, omega, myu, alpha, beta, gamma)]
+            if OUTPUT_CONSECUTIVE_IMG:
+                img_ = np.clip(enhancedImg, 0, 1)
+                im = Image.fromarray(np.uint8(img_.reshape((imgH, imgW, 3)) * 255))
+                im.save(enhanceImgOutputPath + fileName + "_" + str(it) + ".jpg", quality=100)
             
+            if OUTPUT_SIGNAL_IMG:
+                Ml = np.matrix([[0.7126, 0.1142, 0.0827],
+                                [0.0236, 0.3976, 0.0256],
+                                [0.0217, 0.0453, 0.5512]], dtype=np.float)
+            
+                signal = [np.dot(Ml, rgb) for rgb in enhancedImg]
+                signalImg = np.array(signal)
 
-            if enhanceLoss < 1e-5:
-                print("Enhance Iter:%2d, Enhance Loss=%f" % (k, enhanceLoss))
-                break
-            else:
-                rgbBefore = copy.deepcopy(enhancedImg)
-        
-        #色相修正
-        if DO_HUE_CORRECTION:
-            #最適化
-            hueOpt = minimize(optimaizeFunc, enhancedImg.flatten('F'), 
-                                method='CG',  
-                                options={'gtol': 1e-8, 'disp': False},
-                                jac=optimaizeFuncGradient
-                            )
+                img_ = np.clip(signalImg, 0, 1)
+                im = Image.fromarray(np.uint8(img_.reshape((imgH, imgW, 3)) * 255))
+                im.save(signalImgOutputPath + fileName + "_" + str(it) + "_Signal.jpg", quality=100)
 
-            #最適化結果を整形
-            r, g, b = np.split(hueOpt.x, 3)
-            enhancedImg = np.c_[r, g, b]
-
-            #入力画像との色相差を計算
-            hueLoss = np.sqrt(mean_squared_error(ITPHue(enhancedImg[:, 0], enhancedImg[:, 1], enhancedImg[:, 2]), ITPHue0))
-            print(hueLoss)
-        
-        hueLossSet = np.r_[hueLossSet, np.sqrt(mean_squared_error(ITPHue(enhancedImg[:, 0], enhancedImg[:, 1], enhancedImg[:, 2]), ITPHue0))]
-
-        if OUTPUT_CONSECUTIVE_IMG:
-            img_ = np.clip(enhancedImg, 0, 1)
-            im = Image.fromarray(np.uint8(img_.reshape((imgH, imgW, 3)) * 255))
-            im.save(enhanceImgOutputPath + fileName + "_" + str(it) + ".jpg", quality=100)
-        
-        if OUTPUT_SIGNAL_IMG:
-            Ml = np.matrix([[0.7126, 0.1142, 0.0827],
-                            [0.0236, 0.3976, 0.0256],
-                            [0.0217, 0.0453, 0.5512]], dtype=np.float)
-        
-            signal = [np.dot(Ml, rgb) for rgb in enhancedImg]
-            signalImg = np.array(signal)
-
-            img_ = np.clip(signalImg, 0, 1)
-            im = Image.fromarray(np.uint8(img_.reshape((imgH, imgW, 3)) * 255))
-            im.save(signalImgOutputPath + fileName + "_" + str(it) + "_Signal.jpg", quality=100)
-
-        gamma += 0.01
-        alpha = np.abs(gamma) / 20
+            gamma += 0.01
+            alpha = np.abs(gamma) / 20
+    else:
+        print("Select exist method")
+        return [], []
 
     #入力画像との色相の二乗平均平方根誤差(RMSE)
     hueLoss = np.sqrt(mean_squared_error(ITPHue(enhancedImg[:, 0], enhancedImg[:, 1], enhancedImg[:, 2]), ITPHue0))
