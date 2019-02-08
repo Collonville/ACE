@@ -58,5 +58,3 @@ im = Image.fromarray(np.uint8(blendRGB * 255))
 im.save(blendImgOutputPath + imgFilename + "_" + str(iter) + "_k" + str(k).replace('.', '') + "_Blend.jpg", quality=100)
 
 plt.show()
-
-
