@@ -54,7 +54,6 @@ achromaticBlackPixelBool = np.where(HSV[:, 2] < 0.25)
 RGB[achromaticWhitePixelBool] = np.array([1, 1, 0])
 RGB[achromaticBlackPixelBool] = np.array([1, 0, 0])
 
-
 #-----------------------------------------------
 inputRGB = inputRGB.reshape((imgH, imgW, 3))
 RGB = RGB.reshape((imgH, imgW, 3))
