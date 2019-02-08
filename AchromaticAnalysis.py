@@ -30,6 +30,7 @@ win_unicode_console.enable()
 #表示のフォーマットを定義
 np.set_printoptions(precision=10, suppress=True, threshold=np.inf, linewidth=100)
 
+#理想白色の制御値
 Wtarget = np.array([0.9075, 0.6791, 0.4823])
 
 def getImageRGBFromPath(filePath):
@@ -59,6 +60,7 @@ achromaticBlackPixelBool = np.where(HSV[:, 2] <= 0.2)
 maskRGB[achromaticWhitePixelBool] = np.array([1, 1, 0])
 maskRGB[achromaticBlackPixelBool] = np.array([1, 0, 0])
 
+#無彩色変換
 analyzedRGB[achromaticWhitePixelBool] = HSV[achromaticWhitePixelBool, 2].reshape((-1, 1)) * np.transpose(Wtarget)
 analyzedRGB[achromaticBlackPixelBool] = HSV[achromaticBlackPixelBool, 2].reshape((-1, 1)) * np.transpose(Wtarget)
 
@@ -85,6 +87,3 @@ im = Image.fromarray(np.uint8(blendRGB * 255))
 im.save(blendImgOutputPath + imgFilename + "_" + str(iter) + "_k" + str(k).replace('.', '') + "_Blend.jpg", quality=100)
 '''
 plt.show()
-
-
-
