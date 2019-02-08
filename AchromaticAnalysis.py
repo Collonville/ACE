@@ -30,6 +30,8 @@ win_unicode_console.enable()
 #表示のフォーマットを定義
 np.set_printoptions(precision=10, suppress=True, threshold=np.inf, linewidth=100)
 
+Wtarget = np.array([0.9075, 0.6791, 0.4823])
+
 def getImageRGBFromPath(filePath):
     inputImg = cv2.imread(filePath, cv2.IMREAD_COLOR)
 
@@ -39,34 +41,44 @@ def getImageRGBFromPath(filePath):
 
     return rgb, inputImg.shape[0], inputImg.shape[1]
 
-imgPath= sys.argv[1]
+imgPath = sys.argv[1]
 
 #ブレンドした画像の読み込み
 RGB, imgH, imgW = getImageRGBFromPath(imgPath + ".jpg")
-inputRGB = np.copy(RGB)
+inputRGB        = np.copy(RGB)
+maskRGB         = np.copy(RGB)
+analyzedRGB     = np.copy(RGB)
 
 HSV = colour.RGB_to_HSV(RGB)
 
 #低彩度値の画素を抽出
-achromaticWhitePixelBool = np.where((HSV[:, 2] >= 0.76) & (HSV[:, 1] <= 0.45))
-achromaticBlackPixelBool = np.where(HSV[:, 2] <= 0.24)
+achromaticWhitePixelBool = np.where((HSV[:, 2] >= 0.80) & (HSV[:, 1] <= 0.45))
+achromaticBlackPixelBool = np.where(HSV[:, 2] <= 0.2)
 
 #対象領域の着色
-RGB[achromaticWhitePixelBool] = np.array([1, 1, 0])
-RGB[achromaticBlackPixelBool] = np.array([1, 0, 0])
+maskRGB[achromaticWhitePixelBool] = np.array([1, 1, 0])
+maskRGB[achromaticBlackPixelBool] = np.array([1, 0, 0])
+
+analyzedRGB[achromaticWhitePixelBool] = HSV[achromaticWhitePixelBool, 2].reshape((-1, 1)) * np.transpose(Wtarget)
+analyzedRGB[achromaticBlackPixelBool] = HSV[achromaticBlackPixelBool, 2].reshape((-1, 1)) * np.transpose(Wtarget)
 
 #-----------------------------------------------
-inputRGB = inputRGB.reshape((imgH, imgW, 3))
-RGB = RGB.reshape((imgH, imgW, 3))
+inputRGB    = inputRGB.reshape((imgH, imgW, 3))
+maskRGB     = maskRGB.reshape((imgH, imgW, 3))
+analyzedRGB = analyzedRGB.reshape((imgH, imgW, 3))
 
 fig = plt.figure()
 ax1 = fig.add_subplot(131)
 ax1.imshow(inputRGB)
-ax1.set_title("Input blend image")
+ax1.set_title("Input image")
 
 ax2 = fig.add_subplot(132)
-ax2.imshow(RGB)
-ax2.set_title("Achromatic Pixel")
+ax2.imshow(maskRGB)
+ax2.set_title("Achromatic pixel")
+
+ax3 = fig.add_subplot(133)
+ax3.imshow(analyzedRGB)
+ax3.set_title("Achromatic Analysised image")
 
 '''
 im = Image.fromarray(np.uint8(blendRGB * 255))
