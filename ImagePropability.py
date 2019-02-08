@@ -56,10 +56,14 @@ features = scaler.transform(features)
 portion = intercept + np.dot(coef, features.T)
 propability = 1. / (1. + np.exp(-portion))
 
-#合計が1に正規化
+#合計を1に正規化
 propability = propability / np.sum(propability)
 
 print("Max iter=%d, propability=%f" % (np.argmax(propability), np.max(propability)))
+
+#補正値を加えた後の最良推定反復回数
+print("Correction value=" + str(np.argmax(propability) + 8))
+
 plt.plot(propability)
 plt.plot(np.argmax(propability), np.max(propability), marker='o', color='r')
 plt.text(np.argmax(propability) + 5, np.max(propability), "Iter=%d, Propability=%f" % (np.argmax(propability), np.max(propability)))
