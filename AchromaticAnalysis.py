@@ -48,9 +48,10 @@ inputRGB = np.copy(RGB)
 HSV = colour.RGB_to_HSV(RGB)
 
 #低彩度値の画素を抽出
-achromaticWhitePixelBool = np.where(HSV[:, 2] > 0.8)
-achromaticBlackPixelBool = np.where(HSV[:, 2] < 0.25)
+achromaticWhitePixelBool = np.where((HSV[:, 2] >= 0.76) & (HSV[:, 1] <= 0.45))
+achromaticBlackPixelBool = np.where(HSV[:, 2] <= 0.24)
 
+#対象領域の着色
 RGB[achromaticWhitePixelBool] = np.array([1, 1, 0])
 RGB[achromaticBlackPixelBool] = np.array([1, 0, 0])
 
