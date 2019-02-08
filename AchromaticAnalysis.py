@@ -42,8 +42,8 @@ def getImageRGBFromPath(filePath):
 
     return rgb, inputImg.shape[0], inputImg.shape[1]
 
-imgInputPath = "outimg/ACE2/ACEMethod1/Blend/"
-imgOutputPath = "outimg/ACE2/ACEMethod1/FinalOutput/"
+imgInputPath = "outimg/ACE2/ACEMethod1/BlendImage/"
+imgOutputPath = "outimg/ACE2/ACEMethod1/FinalSignalImage/"
 imgFileName = sys.argv[1] 
 
 #ブレンドした画像の読み込み
@@ -78,11 +78,11 @@ ax1.set_title("Input image")
 
 ax2 = fig.add_subplot(132)
 ax2.imshow(maskRGB)
-ax2.set_title("Achromatic pixel")
+ax2.set_title("Achromatic pixel(Red:blackish, Yellow:whitish)")
 
 ax3 = fig.add_subplot(133)
 ax3.imshow(analyzedRGB)
-ax3.set_title("Achromatic Analysised image")
+ax3.set_title("Achromatic analysised image")
 
 im = Image.fromarray(np.uint8(analyzedRGB * 255))
 im.save(imgOutputPath + imgFileName + "_Final.jpg", quality=100)
