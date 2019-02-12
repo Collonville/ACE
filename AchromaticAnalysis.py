@@ -42,21 +42,24 @@ def getImageRGBFromPath(filePath):
 
     return rgb, inputImg.shape[0], inputImg.shape[1]
 
-imgInputPath = "outimg/ACE2/ACEMethod1/BlendImage/"
-imgOutputPath = "outimg/ACE2/ACEMethod1/FinalSignalImage/"
-imgFileName = sys.argv[1] 
+imgInputPath         = "outimg/FinalResult/BlendImage/"
+enhancedImgInputpath = "outimg/FinalResult/EnhancedImage/"
+imgOutputPath        = "outimg/FinalResult/FinalSignalImage/"
+imgFileName = sys.argv[1]
+enhancedFileName = sys.argv[2] 
 
 #ブレンドした画像の読み込み
 RGB, imgH, imgW = getImageRGBFromPath(imgInputPath + imgFileName + ".jpg")
 inputRGB        = np.copy(RGB)
 maskRGB         = np.copy(RGB)
 analyzedRGB     = np.copy(RGB)
+enhancedRGB, w, h = getImageRGBFromPath(enhancedImgInputpath + enhancedFileName + ".jpg")
 
-HSV = colour.RGB_to_HSV(RGB)
+HSV = colour.RGB_to_HSV(enhancedRGB)
 
 #低彩度値の画素を抽出
-achromaticWhitePixelBool = np.where((HSV[:, 2] >= 0.80) & (HSV[:, 1] <= 0.45))
-achromaticBlackPixelBool = np.where(HSV[:, 2] <= 0.2)
+achromaticWhitePixelBool = np.where((HSV[:, 2] >= 0.86) & (HSV[:, 1] <= 0.27))
+achromaticBlackPixelBool = np.where(HSV[:, 2] <= 0.25)
 
 #対象領域の着色
 maskRGB[achromaticWhitePixelBool] = np.array([1, 1, 0])
